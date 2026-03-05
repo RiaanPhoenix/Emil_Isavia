@@ -1,0 +1,57 @@
+# Core web framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# API and data handling
+requests==2.31.0
+numpy==1.24.3
+pandas==1.5.3
+
+# Optimization (optional - fallback to approximations if not available)
+gurobipy>=10.0.0  # Optional: requires license
+
+# Simulation
+simpy==4.0.2
+
+# Configuration and utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Date/time handling
+pytz==2023.3
+python-dateutil==2.8.2
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Development and testing (optional)
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.9.1
+flake8==6.1.0
+
+# Production server (optional)
+gunicorn==21.2.0
+
+# Additional data processing (optional)
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Aviation data APIs (optional)
+# Add specific API client libraries as needed
+
+# Database support (for future expansion)
+SQLAlchemy==2.0.23
+sqlite3
+
+# Security
+cryptography==41.0.7
+bcrypt==4.0.1
+
+# Utilities
+click==8.1.7
+tqdm==4.66.1
+colorama==0.4.6
+
+# Environment detection
+python-environ==0.4.54
