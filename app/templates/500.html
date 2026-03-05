@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Emil Isavia - System Error{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="error-page">
+                <i class="fas fa-tools fa-5x text-danger mb-4"></i>
+                <h1 class="display-4 text-danger">500</h1>
+                <h2 class="mb-3">System Maintenance Required</h2>
+                <p class="lead text-muted">
+                    Our valet system encountered an unexpected issue and needs attention.
+                </p>
+                <p class="text-muted mb-4">
+                    The engineering team has been notified and is working to resolve this.
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> Try Dashboard Again
+                    </a>
+                    <a href="{{ url_for('api_status') }}" class="btn btn-outline-info" target="_blank">
+                        <i class="fas fa-heartbeat"></i> Check System Status
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Troubleshooting info -->
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Troubleshooting</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Common Issues:</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-circle text-primary" style="font-size: 0.5rem;"></i> GurobiPy optimization license error → System falls back to heuristic</li>
+                        <li><i class="fas fa-circle text-primary" style="font-size: 0.5rem;"></i> External flight API timeout → Uses mock data</li>
+                        <li><i class="fas fa-circle text-primary" style="font-size: 0.5rem;"></i> Database connection issue → Check system logs</li>
+                    </ul>
+                    
+                    <h6 class="mt-3">If the problem persists:</h6>
+                    <ol>
+                        <li>Check the system status endpoint</li>
+                        <li>Verify all dependencies are installed</li>
+                        <li>Review application logs</li>
+                        <li>Contact the development team</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

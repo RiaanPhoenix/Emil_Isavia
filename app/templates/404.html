@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Emil Isavia - Page Not Found{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="error-page">
+                <i class="fas fa-car-crash fa-5x text-muted mb-4"></i>
+                <h1 class="display-4 text-primary">404</h1>
+                <h2 class="mb-3">Oops! Car Not Found</h2>
+                <p class="lead text-muted">
+                    The page you're looking for seems to have been moved to a different parking zone.
+                </p>
+                <p class="text-muted mb-4">
+                    Don't worry, our valet team will help you find what you need!
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> Return to Dashboard
+                    </a>
+                    <a href="{{ url_for('optimize_page') }}" class="btn btn-outline-warning">
+                        <i class="fas fa-cogs"></i> Try Optimization
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Helpful links -->
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Links</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-tachometer-alt text-primary"></i> Dashboard</h6>
+                            <p class="small text-muted">Main system overview and workflow</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-cogs text-warning"></i> Optimization</h6>
+                            <p class="small text-muted">Staff scheduling and car movements</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-flask text-info"></i> Simulation</h6>
+                            <p class="small text-muted">Monte Carlo stress testing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Emil Isavia - Optimization{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="fas fa-cogs text-warning"></i> Valet Optimization</h1>
+        <p class="lead text-muted">Optimize staff scheduling and car movements for Premium valet operations</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="fas fa-sliders-h"></i> Optimization Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form id="optimizationForm">
+                    <div class="mb-3">
+                        <label class="form-label">Planning Date</label>
+                        <input type="date" class="form-control" id="planDate" value="">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Number of Customers</label>
+                        <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Max Staff Available</label>
+                        <input type="number" class="form-control" id="maxStaff" value="10" min="1" max="20">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Delivery Lead Time (minutes)</label>
+                        <input type="number" class="form-control" id="leadTime" value="15" min="5" max="60">
+                    </div>
+                    
+                    <button type="button" class="btn btn-warning" onclick="runOptimization()">
+                        <i class="fas fa-play"></i> Run Optimization
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-bar"></i> Optimization Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="optimizationResults" class="text-center text-muted">
+                    <i class="fas fa-cogs fa-3x mb-3"></i>
+                    <p>Configure parameters and run optimization to see results</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runOptimization() {
+    const form = document.getElementById('optimizationForm');
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing...';
+    btn.disabled = true;
+    
+    const resultsDiv = document.getElementById('optimizationResults');
+    resultsDiv.innerHTML = '<div class="spinner-border"></div><p>Running optimization...</p>';
+    
+    // Simulate optimization call
+    const data = {
+        base_time: document.getElementById('planDate').value + 'T00:00:00',
+        n_customers: parseInt(document.getElementById('numCustomers').value)
+    };
+    
+    fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6>Optimization Complete!</h6>
+                    <p><strong>Status:</strong> ${data.optimization_result.status}</p>
+                    <p><strong>Staff Hours:</strong> ${data.optimization_result.total_staff_hours.toFixed(1)}</p>
+                    <p><strong>Car Movements:</strong> ${data.optimization_result.car_movements.length}</p>
+                </div>
+            `;
+        } else {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+        }
+    })
+    .catch(error => {
+        resultsDiv.innerHTML = '<div class="alert alert-danger">Optimization failed</div>';
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Set today's date
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('planDate').value = new Date().toISOString().split('T')[0];
+});
+</script>
+{% endblock %}

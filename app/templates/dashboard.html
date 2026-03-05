@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Emil Isavia - Analytics Dashboard{% endblock %}
+
+{% block head %}
+<style>
+.metric-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-left: 4px solid var(--primary-color);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="fas fa-chart-line text-primary"></i> Analytics Dashboard</h1>
+        <p class="lead text-muted">Performance metrics and operational insights</p>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="card-body text-center">
+                <h3 class="text-primary">95.2%</h3>
+                <p class="mb-0">Service Level</p>
+                <small class="text-muted">Cars ready on time</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="card-body text-center">
+                <h3 class="text-warning">127.5</h3>
+                <p class="mb-0">Staff Hours/Day</p>
+                <small class="text-muted">Optimized schedule</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="card-body text-center">
+                <h3 class="text-info">2.3</h3>
+                <p class="mb-0">Avg Wait Time</p>
+                <small class="text-muted">Minutes (negative = early)</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="card-body text-center">
+                <h3 class="text-success">89%</h3>
+                <p class="mb-0">Zone Utilization</p>
+                <small class="text-muted">Peak capacity usage</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-area"></i> Daily Traffic Pattern</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="trafficChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> Zone Utilization</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="zoneChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Operations -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Recent Operations Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Date</th>
+                                <th>Bookings</th>
+                                <th>Staff Hours</th>
+                                <th>Service Level</th>
+                                <th>Violations</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2026-03-05</td>
+                                <td>63</td>
+                                <td>142.3</td>
+                                <td>94.1%</td>
+                                <td>2</td>
+                                <td><span class="badge bg-success">Optimal</span></td>
+                            </tr>
+                            <tr>
+                                <td>2026-03-04</td>
+                                <td>58</td>
+                                <td>128.7</td>
+                                <td>96.5%</td>
+                                <td>0</td>
+                                <td><span class="badge bg-success">Optimal</span></td>
+                            </tr>
+                            <tr>
+                                <td>2026-03-03</td>
+                                <td>71</td>
+                                <td>156.2</td>
+                                <td>93.0%</td>
+                                <td>3</td>
+                                <td><span class="badge bg-warning">Heuristic</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Sample charts
+document.addEventListener('DOMContentLoaded', function() {
+    // Traffic pattern chart
+    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+    new Chart(trafficCtx, {
+        type: 'line',
+        data: {
+            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+            datasets: [{
+                label: 'Drop-offs',
+                data: [2, 1, 15, 8, 22, 6],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true
+            }, {
+                label: 'Pick-ups',
+                data: [1, 3, 5, 18, 20, 12],
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Operations'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Zone utilization chart
+    const zoneCtx = document.getElementById('zoneChart').getContext('2d');
+    new Chart(zoneCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Reception', 'Gull', 'P3', 'Delivery'],
+            datasets: [{
+                data: [14, 45, 120, 18],
+                backgroundColor: [
+                    '#0d6efd',
+                    '#ffc107', 
+                    '#6f42c1',
+                    '#198754'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -15,13 +15,16 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 
 from app.api.flights import generate_bookings_from_api
+from app.api.parking_api import get_real_valet_bookings, test_api_connection
 from app.optimization.valet_optimizer import ValetOptimizer
 from app.simulation.valet_sim import run_monte_carlo_simulation
 from config import settings
 
 # ── Application setup ───────────────────────────────────────────────
 
-app = Flask(__name__)
+app = Flask(__name__, 
+            template_folder='app/templates',
+            static_folder='app/static')
 app.secret_key = settings.SECRET_KEY
 
 # Configure logging
@@ -45,25 +48,35 @@ def index():
 
 @app.route('/api/bookings')
 def api_bookings():
-    """Get current valet bookings from flight API."""
+    """Get current valet bookings from parking API or flight API."""
     try:
         # Get parameters
         date_str = request.args.get('date')
         n_customers = int(request.args.get('customers', 60))
+        use_real_api = request.args.get('use_real', 'true').lower() == 'true'
         
         if date_str:
             base_date = datetime.fromisoformat(date_str)
         else:
             base_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Generate bookings
-        bookings = generate_bookings_from_api(base_date, n_customers)
+        # Choose data source
+        if use_real_api:
+            # Try real Premium Parking API first
+            end_date = base_date + timedelta(hours=settings.PLANNING_HORIZON_H)
+            bookings = get_real_valet_bookings(base_date, end_date)
+            data_source = "premium_parking_api"
+        else:
+            # Use flight-based mock data
+            bookings = generate_bookings_from_api(base_date, n_customers)
+            data_source = "flight_api_mock"
         
         return jsonify({
             "success": True,
             "data": [booking.to_dict() for booking in bookings],
             "base_date": base_date.isoformat(),
             "count": len(bookings),
+            "data_source": data_source,
             "timestamp": datetime.utcnow().isoformat()
         })
         
@@ -230,17 +243,29 @@ def api_status():
         except ImportError:
             sim_status = "error"
         
-        # Test API connection
+        # Test API connections
         api_status = "ready"
+        parking_api_status = "not_configured"
+        
         try:
-            # Quick test of flight API
-            bookings = generate_bookings_from_api(n_premium_customers=1)
-            if bookings:
-                api_status = "connected"
+            # Test Premium Parking API
+            parking_test = test_api_connection()
+            if parking_test['connected']:
+                parking_api_status = "connected"
+                api_status = "premium_api_available"
             else:
-                api_status = "mock_data"
-        except Exception:
+                parking_api_status = "error"
+                
+            # Fallback to flight API test
+            if parking_api_status != "connected":
+                bookings = generate_bookings_from_api(n_premium_customers=1)
+                if bookings:
+                    api_status = "mock_data_fallback"
+                else:
+                    api_status = "error"
+        except Exception as e:
             api_status = "error"
+            parking_api_status = "error"
         
         return jsonify({
             "status": "healthy",
@@ -248,6 +273,7 @@ def api_status():
                 "optimization": opt_status,
                 "simulation": sim_status,
                 "flight_api": api_status,
+                "premium_parking_api": parking_api_status,
             },
             "config": {
                 "airport": settings.AIRPORT_ICAO,
@@ -287,6 +313,20 @@ def simulate_page():
 def dashboard_page():
     """Analytics dashboard page."""
     return render_template('dashboard.html')
+
+
+@app.route('/api/test-parking-api')
+def api_test_parking():
+    """Test Premium Parking API connection."""
+    try:
+        result = test_api_connection()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Test failed: {e}',
+            'connected': False
+        }), 500
 
 
 # ── Error handlers ──────────────────────────────────────────────────

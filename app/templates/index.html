@@ -28,12 +28,12 @@
         <div class="card border-success">
             <div class="card-body text-center">
                 <h6 class="card-title text-success">
-                    <i class="fas fa-plane"></i> Flight API
+                    <i class="fas fa-car"></i> Parking API
                 </h6>
-                <h4 id="apiStatus" class="mb-0">
+                <h4 id="parkingApiStatus" class="mb-0">
                     <div class="spinner-border spinner-border-sm"></div>
                 </h4>
-                <small class="text-muted">External data</small>
+                <small class="text-muted">Real bookings</small>
             </div>
         </div>
     </div>
@@ -94,13 +94,22 @@
                 <p class="text-muted">Pull flight data and generate Premium valet customer bookings.</p>
                 
                 <div class="row g-3 mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Date</label>
                         <input type="date" class="form-control" id="bookingDate" value="">
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Number of Customers</label>
                         <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
+                        <small class="text-muted">For mock data only</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Data Source</label>
+                        <select class="form-control" id="dataSource">
+                            <option value="real">🔴 Real Parking API</option>
+                            <option value="mock">🔵 Mock Flight Data</option>
+                        </select>
+                        <small class="text-muted">Real API preferred</small>
                     </div>
                 </div>
                 
@@ -378,7 +387,7 @@ function refreshSystemStatus() {
             const components = data.components || {};
             
             // Update status indicators
-            document.getElementById('apiStatus').innerHTML = getStatusIcon(components.flight_api);
+            document.getElementById('parkingApiStatus').innerHTML = getStatusIcon(components.premium_parking_api);
             document.getElementById('optimizerStatus').innerHTML = getStatusIcon(components.optimization);
             document.getElementById('simulatorStatus').innerHTML = getStatusIcon(components.simulation);
             
@@ -398,13 +407,17 @@ function refreshSystemStatus() {
 function getStatusIcon(status) {
     switch (status) {
         case 'connected':
+        case 'premium_api_available':
         case 'gurobi_available':
         case 'simpy_available':
         case 'ready':
             return '<i class="fas fa-check-circle text-success"></i>';
         case 'mock_data':
+        case 'mock_data_fallback':
         case 'heuristic_only':
             return '<i class="fas fa-exclamation-circle text-warning"></i>';
+        case 'not_configured':
+            return '<i class="fas fa-question-circle text-info"></i>';
         case 'error':
         default:
             return '<i class="fas fa-times-circle text-danger"></i>';
@@ -420,8 +433,10 @@ function generateBookings() {
     
     const date = document.getElementById('bookingDate').value;
     const numCustomers = document.getElementById('numCustomers').value;
+    const dataSource = document.getElementById('dataSource').value;
+    const useReal = dataSource === 'real' ? 'true' : 'false';
     
-    fetch(`/api/bookings?date=${date}&customers=${numCustomers}`)
+    fetch(`/api/bookings?date=${date}&customers=${numCustomers}&use_real=${useReal}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -430,10 +445,14 @@ function generateBookings() {
                 document.getElementById('bookingsResult').style.display = 'block';
                 document.getElementById('totalBookings').textContent = data.count;
                 
+                // Show data source
+                const sourceText = data.data_source === 'premium_parking_api' ? 
+                    '🔴 Real Premium Parking API' : '🔵 Mock Flight Data';
+                
                 // Enable optimization
                 document.getElementById('optimizeBtn').disabled = false;
                 
-                showSuccess(`Generated ${data.count} valet bookings`);
+                showSuccess(`Generated ${data.count} valet bookings from ${sourceText}`);
             } else {
                 showError(`Failed to generate bookings: ${data.error}`);
             }

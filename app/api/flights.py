@@ -36,6 +36,8 @@ class ValetBooking:
     arrival_time: datetime    # customer lands back (= flight arrival)
     car_plate: str = ""
     pax_name: str = ""
+    current_zone: str = ""    # current parking zone (for real API data)
+    days_parked: int = 1      # number of days parked (for real API data)
 
     def to_dict(self) -> dict:
         d = asdict(self)
