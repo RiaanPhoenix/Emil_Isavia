@@ -1,171 +1,54 @@
 """
-Configuration settings for Emil Isavia application
+Central configuration for the Emil Isavia valet-parking system.
+Override any value via environment variables (prefixed ISAVIA_).
 """
 
 import os
-from datetime import timedelta
 
-# API Configuration
-API_CONFIG = {
-    'aviation_stack': {
-        'base_url': 'http://api.aviationstack.com/v1',
-        'api_key_env': 'AVIATIONSTACK_API_KEY',
-        'timeout': 10,
-        'rate_limit': 1000  # requests per month for free tier
-    },
-    'opensky': {
-        'base_url': 'https://opensky-network.org/api',
-        'timeout': 10,
-        'rate_limit': None  # No official limit
-    },
-    'airlabs': {
-        'base_url': 'https://airlabs.co/api/v9',
-        'api_key_env': 'AIRLABS_API_KEY',
-        'timeout': 10,
-        'rate_limit': 1000  # requests per month for free tier
-    }
-}
+# ── External Flight API ─────────────────────────────────────────────
+# We use the free OpenSky Network REST API by default.
+# Set ISAVIA_FLIGHT_API_KEY for AviationStack / AirLabs etc.
+FLIGHT_API_PROVIDER = os.getenv("ISAVIA_FLIGHT_API_PROVIDER", "opensky")
+FLIGHT_API_KEY = os.getenv("ISAVIA_FLIGHT_API_KEY", "")
+AIRPORT_ICAO = os.getenv("ISAVIA_AIRPORT_ICAO", "BIKF")  # Keflavík
 
-# Airport Configuration
-AIRPORT_CONFIG = {
-    'default_airport': 'BIKF',  # Keflavik International Airport
-    'timezone': 'Atlantic/Reykjavik',
-    
-    # Default capacity constraints
-    'capacity': {
-        'runways': 2,
-        'gates': 12,
-        'total_slots': 48,  # 30-minute slots in 24 hours
-        'runway_capacity': 4,  # Operations per slot
-        'premium_slots': 20,
-        'checkin_counters': 8,
-        'security_lanes': 4,
-        'baggage_belts': 6,
-        'ground_crew_teams': 10,
-        'fuel_trucks': 4,
-        'catering_trucks': 3
-    }
-}
+# ── Physical layout ─────────────────────────────────────────────────
+CAPACITY_RECEPTION  = int(os.getenv("ISAVIA_CAP_RECEPTION", 14))
+CAPACITY_GULL       = int(os.getenv("ISAVIA_CAP_GULL", 50))
+CAPACITY_P3         = int(os.getenv("ISAVIA_CAP_P3", 150))
+CAPACITY_DELIVERY   = int(os.getenv("ISAVIA_CAP_DELIVERY", 20))
 
-# Optimization Configuration
-OPTIMIZATION_CONFIG = {
-    'gurobi': {
-        'time_limit': 300,  # 5 minutes
-        'gap': 0.01,  # 1% optimality gap
-        'log_to_console': False
-    },
-    
-    'pricing': {
-        'base_price_domestic': 150.0,
-        'base_price_international': 300.0,
-        'premium_multiplier': 1.5,
-        'demand_elasticity': 0.8
-    },
-    
-    'scheduling': {
-        'min_turnaround_time': 60,  # minutes
-        'preferred_slot_spacing': 15,  # minutes
-        'peak_hours': [(6, 10), (16, 20)],  # Peak traffic hours
-        'night_curfew': (23, 6)  # Night operations restrictions
-    }
-}
+# ── Travel times between zones (minutes, one-way by car) ───────────
+TRAVEL_RECEPTION_TO_GULL     = float(os.getenv("ISAVIA_TT_REC_GULL", 3))
+TRAVEL_RECEPTION_TO_P3       = float(os.getenv("ISAVIA_TT_REC_P3", 8))
+TRAVEL_GULL_TO_DELIVERY      = float(os.getenv("ISAVIA_TT_GULL_DEL", 4))
+TRAVEL_P3_TO_DELIVERY        = float(os.getenv("ISAVIA_TT_P3_DEL", 9))
+TRAVEL_DELIVERY_TO_RECEPTION = float(os.getenv("ISAVIA_TT_DEL_REC", 3))
+# Walk-back time (staff walks back after driving a car)
+WALK_GULL_TO_RECEPTION       = float(os.getenv("ISAVIA_WK_GULL_REC", 5))
+WALK_P3_TO_RECEPTION         = float(os.getenv("ISAVIA_WK_P3_REC", 12))
+WALK_DELIVERY_TO_GULL        = float(os.getenv("ISAVIA_WK_DEL_GULL", 6))
+WALK_DELIVERY_TO_P3          = float(os.getenv("ISAVIA_WK_DEL_P3", 13))
 
-# Simulation Configuration
-SIMULATION_CONFIG = {
-    'default_duration': 24.0,  # hours
-    'random_seed': None,  # Set for reproducible results
-    
-    'passenger_flow': {
-        'checkin_window': 120,  # minutes before departure
-        'security_time_per_passenger': (1, 4),  # min, max minutes
-        'boarding_rate': 0.5,  # minutes per passenger
-        'load_factor_range': (0.6, 0.95)
-    },
-    
-    'ground_operations': {
-        'baggage_time': (15, 30),  # min, max minutes
-        'fuel_time': (20, 40),
-        'catering_time': (10, 25),
-        'cleaning_time': (15, 35),
-        'gate_time': (30, 90)
-    }
-}
+# ── Operational parameters ──────────────────────────────────────────
+# How early (minutes before flight arrival) a car must be at delivery
+DELIVERY_LEAD_TIME  = float(os.getenv("ISAVIA_DELIVERY_LEAD", 15))
+# Time slot granularity for the optimisation model (minutes)
+TIME_SLOT_MINUTES   = int(os.getenv("ISAVIA_SLOT_MIN", 15))
+# Planning horizon (hours)
+PLANNING_HORIZON_H  = int(os.getenv("ISAVIA_HORIZON_H", 24))
+# Maximum staff available
+MAX_STAFF           = int(os.getenv("ISAVIA_MAX_STAFF", 10))
 
-# Web Application Configuration
-WEB_CONFIG = {
-    'host': '0.0.0.0',
-    'port': 5000,
-    'debug': False,
-    'secret_key': os.environ.get('SECRET_KEY', 'dev-key-change-in-production'),
-    
-    # Session configuration
-    'permanent_session_lifetime': timedelta(days=1),
-    
-    # Cache configuration
-    'cache_timeout': 300,  # 5 minutes
-    
-    # Static files
-    'send_file_max_age': 3600  # 1 hour
-}
+# ── Simulation parameters ──────────────────────────────────────────
+SIM_RUNS            = int(os.getenv("ISAVIA_SIM_RUNS", 10))
+SIM_RANDOM_SEED     = int(os.getenv("ISAVIA_SIM_SEED", 42))
+# Stochastic noise: std-dev of flight delay (minutes, normal distribution)
+SIM_FLIGHT_DELAY_STD = float(os.getenv("ISAVIA_SIM_DELAY_STD", 15))
+# Stochastic noise: std-dev of driving time multiplier
+SIM_DRIVE_TIME_STD   = float(os.getenv("ISAVIA_SIM_DRIVE_STD", 0.15))
 
-# Logging Configuration
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-    },
-    'handlers': {
-        'default': {
-            'level': 'INFO',
-            'formatter': 'standard',
-            'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'level': 'INFO',
-            'formatter': 'standard',
-            'class': 'logging.FileHandler',
-            'filename': 'logs/emil_isavia.log',
-            'mode': 'a',
-        },
-    },
-    'loggers': {
-        '': {
-            'handlers': ['default', 'file'],
-            'level': 'INFO',
-            'propagate': False
-        }
-    }
-}
-
-# Database Configuration (if needed for future expansion)
-DATABASE_CONFIG = {
-    'sqlite': {
-        'path': 'data/emil_isavia.db'
-    },
-    'postgres': {
-        'host': os.environ.get('DB_HOST', 'localhost'),
-        'port': int(os.environ.get('DB_PORT', 5432)),
-        'database': os.environ.get('DB_NAME', 'emil_isavia'),
-        'username': os.environ.get('DB_USER', 'postgres'),
-        'password': os.environ.get('DB_PASSWORD', '')
-    }
-}
-
-# Environment-specific settings
-ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
-
-if ENVIRONMENT == 'production':
-    WEB_CONFIG['debug'] = False
-    LOGGING_CONFIG['loggers']['']['level'] = 'WARNING'
-elif ENVIRONMENT == 'development':
-    WEB_CONFIG['debug'] = True
-    LOGGING_CONFIG['loggers']['']['level'] = 'DEBUG'
-
-# Export commonly used configurations
-DEFAULT_AIRPORT = AIRPORT_CONFIG['default_airport']
-DEFAULT_CAPACITY = AIRPORT_CONFIG['capacity']
-DEFAULT_OPTIMIZATION = OPTIMIZATION_CONFIG
-DEFAULT_SIMULATION = SIMULATION_CONFIG
+# ── Flask / web ─────────────────────────────────────────────────────
+SECRET_KEY = os.getenv("ISAVIA_SECRET_KEY", "dev-change-me")
+DEBUG      = os.getenv("ISAVIA_DEBUG", "true").lower() == "true"
+PORT       = int(os.getenv("ISAVIA_PORT", 5000))
