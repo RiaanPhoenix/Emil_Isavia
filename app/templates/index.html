@@ -260,6 +260,48 @@
             </div>
         </div>
         
+        <!-- Live Feed -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-broadcast-tower"></i> Live Feed</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">Real-time parking occupancy monitoring</p>
+                <div class="row text-center small">
+                    <div class="col-6">
+                        <div class="border rounded p-2 mb-2">
+                            <strong>Reception</strong><br>
+                            <span class="text-primary" id="live-reception">-/-</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2 mb-2">
+                            <strong>Delivery</strong><br>
+                            <span class="text-success" id="live-delivery">-/-</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <strong>Gull</strong><br>
+                            <span class="text-warning" id="live-gull">-/-</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <strong>P3</strong><br>
+                            <span class="text-info" id="live-p3">-/-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-grid gap-2 mt-3">
+                    <a href="/live-feed" class="btn btn-success btn-sm">
+                        <i class="fas fa-external-link-alt"></i> View Live Feed
+                    </a>
+                </div>
+                <small class="text-muted d-block mt-2 text-center" id="live-updated">Loading...</small>
+            </div>
+        </div>
+        
         <!-- Recent Results -->
         <div class="card">
             <div class="card-header">
@@ -377,6 +419,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load system status
     refreshSystemStatus();
+    
+    // Load live feed preview
+    loadLiveFeedPreview();
+    setInterval(loadLiveFeedPreview, 30000); // Update every 30 seconds
 });
 
 // System status
@@ -422,6 +468,39 @@ function getStatusIcon(status) {
         default:
             return '<i class="fas fa-times-circle text-danger"></i>';
     }
+}
+
+// Live feed preview
+function loadLiveFeedPreview() {
+    fetch('/api/live-status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const { occupancy, capacities } = data;
+                
+                // Update live feed preview
+                document.getElementById('live-reception').textContent = `${occupancy.reception}/${capacities.reception}`;
+                document.getElementById('live-gull').textContent = `${occupancy.gull}/${capacities.gull}`;
+                document.getElementById('live-p3').textContent = `${occupancy.p3}/${capacities.p3}`;
+                document.getElementById('live-delivery').textContent = `${occupancy.delivery}/${capacities.delivery}`;
+                
+                const timestamp = new Date(data.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+                document.getElementById('live-updated').textContent = `Updated: ${timestamp}`;
+            } else {
+                // Show error state
+                ['reception', 'gull', 'p3', 'delivery'].forEach(zone => {
+                    document.getElementById(`live-${zone}`).textContent = 'Error';
+                });
+                document.getElementById('live-updated').textContent = 'Connection error';
+            }
+        })
+        .catch(error => {
+            console.error('Live feed preview failed:', error);
+            ['reception', 'gull', 'p3', 'delivery'].forEach(zone => {
+                document.getElementById(`live-${zone}`).textContent = 'N/A';
+            });
+            document.getElementById('live-updated').textContent = 'Offline';
+        });
 }
 
 // Step 1: Generate bookings

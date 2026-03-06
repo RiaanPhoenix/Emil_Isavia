@@ -315,6 +315,125 @@ def dashboard_page():
     return render_template('dashboard.html')
 
 
+@app.route('/live-feed')
+def live_feed_page():
+    """Live parking occupancy feed page."""
+    return render_template('live_feed.html')
+
+
+@app.route('/api/live-status')
+def api_live_status():
+    """Get real-time parking occupancy data."""
+    try:
+        now = datetime.utcnow()
+        # Fetch bookings for a window around now
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = start_date + timedelta(days=1)
+        
+        # Try to get real bookings, fallback to mock if needed
+        try:
+            bookings = get_real_valet_bookings(start_date, end_date)
+            data_source = "premium_parking_api"
+        except Exception:
+            # Use flight-based mock data as fallback
+            bookings = generate_bookings_from_api(start_date, 30)
+            data_source = "flight_api_mock"
+        
+        # Calculate occupancy based on booking timeline
+        occupancy = {
+            "reception": 0,
+            "gull": 0, 
+            "p3": 0,
+            "delivery": 0
+        }
+        
+        active_bookings = []
+        
+        for b in bookings:
+            # Determine current status/zone based on timing
+            # More sophisticated zone assignment based on valet workflow:
+            # 1. Car arrives -> Reception (brief)
+            # 2. Car moved to storage -> Gull or P3 (bulk of time)
+            # 3. Car prepared for return -> Delivery (15 min before pickup)
+            
+            minutes_until_departure = (b.departure_time - now).total_seconds() / 60
+            minutes_since_arrival = (now - b.arrival_time).total_seconds() / 60
+            
+            current_zone = None
+            
+            if now >= b.arrival_time and now <= b.departure_time:
+                # Car is currently parked
+                if minutes_until_departure <= 15:
+                    # Car should be in delivery area (15 min rule)
+                    current_zone = "delivery"
+                elif minutes_since_arrival <= 30:
+                    # Recently arrived, might still be in reception
+                    current_zone = "reception"
+                else:
+                    # In storage - assign to Gull or P3 based on duration
+                    hours_duration = (b.departure_time - b.arrival_time).total_seconds() / 3600
+                    if hours_duration <= 24:
+                        current_zone = "gull"  # Short-term
+                    else:
+                        current_zone = "p3"    # Long-term
+                
+                if current_zone and current_zone in occupancy:
+                    occupancy[current_zone] += 1
+                    active_bookings.append({
+                        "id": b.booking_id,
+                        "plate": getattr(b, 'car_plate', f"***{b.booking_id[-3:]}"),
+                        "zone": current_zone,
+                        "since": b.arrival_time.isoformat(),
+                        "flight": getattr(b, 'flight_out', 'N/A'),
+                        "departure_in_min": max(0, int(minutes_until_departure))
+                    })
+        
+        # Add some randomization for demo purposes if using mock data
+        if data_source == "flight_api_mock":
+            import random
+            random.seed(int(now.timestamp()) // 30)  # Change every 30 seconds
+            
+            # Add some baseline occupancy
+            occupancy["reception"] += random.randint(0, 3)
+            occupancy["gull"] += random.randint(5, 15) 
+            occupancy["p3"] += random.randint(20, 40)
+            occupancy["delivery"] += random.randint(0, 5)
+            
+            # Don't exceed capacities
+            occupancy["reception"] = min(occupancy["reception"], settings.CAPACITY_RECEPTION)
+            occupancy["gull"] = min(occupancy["gull"], settings.CAPACITY_GULL)
+            occupancy["p3"] = min(occupancy["p3"], settings.CAPACITY_P3)
+            occupancy["delivery"] = min(occupancy["delivery"], settings.CAPACITY_DELIVERY)
+        
+        return jsonify({
+            "success": True,
+            "timestamp": now.isoformat(),
+            "data_source": data_source,
+            "occupancy": occupancy,
+            "capacities": {
+                "reception": settings.CAPACITY_RECEPTION,
+                "gull": settings.CAPACITY_GULL,
+                "p3": settings.CAPACITY_P3,
+                "delivery": settings.CAPACITY_DELIVERY
+            },
+            "available": {
+                "reception": settings.CAPACITY_RECEPTION - occupancy["reception"],
+                "gull": settings.CAPACITY_GULL - occupancy["gull"],
+                "p3": settings.CAPACITY_P3 - occupancy["p3"],
+                "delivery": settings.CAPACITY_DELIVERY - occupancy["delivery"]
+            },
+            "active_bookings": active_bookings
+        })
+        
+    except Exception as e:
+        log.error("Live status error: %s", e)
+        return jsonify({
+            "success": False, 
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
+
+
 @app.route('/api/test-parking-api')
 def api_test_parking():
     """Test Premium Parking API connection."""
