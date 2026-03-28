@@ -94,22 +94,21 @@
                 <p class="text-muted">Pull flight data and generate Premium valet customer bookings.</p>
                 
                 <div class="row g-3 mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label">Date</label>
                         <input type="date" class="form-control" id="bookingDate" value="">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Data Source</label>
+                        <select class="form-control" id="dataSource" onchange="toggleCustomerCount()">
+                            <option value="real">Real Parking API</option>
+                            <option value="mock">Mock Flight Data</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6" id="numCustomersField" style="display: none;">
                         <label class="form-label">Number of Customers</label>
                         <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
-                        <small class="text-muted">For mock data only</small>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Data Source</label>
-                        <select class="form-control" id="dataSource">
-                            <option value="real">🔴 Real Parking API</option>
-                            <option value="mock">🔵 Mock Flight Data</option>
-                        </select>
-                        <small class="text-muted">Real API preferred</small>
+                        <small class="text-muted">Simulated bookings to generate</small>
                     </div>
                 </div>
                 
@@ -412,11 +411,20 @@ let currentBookings = null;
 let currentOptimization = null;
 let currentSimulation = null;
 
+// Show/hide customer count based on data source
+function toggleCustomerCount() {
+    const source = document.getElementById('dataSource').value;
+    document.getElementById('numCustomersField').style.display = source === 'mock' ? 'block' : 'none';
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     // Set today's date
     document.getElementById('bookingDate').value = new Date().toISOString().split('T')[0];
-    
+
+    // Set initial field visibility
+    toggleCustomerCount();
+
     // Load system status
     refreshSystemStatus();
     
