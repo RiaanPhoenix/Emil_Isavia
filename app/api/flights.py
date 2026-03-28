@@ -178,7 +178,7 @@ def _bookings_from_real_flights(
     """Pair departures with arrivals to create valet bookings."""
     bookings = []
     used_arrivals = set()
-    rng = random.Random(42)
+    rng = random.Random(int(base_date.strftime('%Y%m%d')))
 
     dep_list = departures[:n]
     for i, dep in enumerate(dep_list):
@@ -244,7 +244,9 @@ def _generate_mock_bookings(n: int, base_date: datetime) -> List[ValetBooking]:
     Create realistic mock bookings spread across the planning horizon.
     Mimics Keflavík traffic patterns (busy morning departures, afternoon arrivals).
     """
-    rng = random.Random(settings.SIM_RANDOM_SEED)
+    # Seed from the date so each day produces different but reproducible bookings
+    date_seed = int(base_date.strftime('%Y%m%d'))
+    rng = random.Random(date_seed)
     bookings = []
 
     # Typical Keflavík departure waves (hour, relative_weight)
