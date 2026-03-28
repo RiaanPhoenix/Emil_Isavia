@@ -209,8 +209,20 @@ class ValetSimulation:
         yield self.env.timeout(scheduled_time)
         
         car = self.cars.get(car_id)
-        if not car or car.current_zone != from_zone:
-            log.warning("Cannot move car %s: not in %s at t=%.1f", car_id, from_zone, self.env.now)
+        if not car:
+            log.warning("Cannot move car %s: booking not found", car_id)
+            return
+
+        # If the car hasn't arrived at the expected source zone yet, wait up to 60 min
+        wait_limit = 60
+        waited = 0
+        while car.current_zone != from_zone and waited < wait_limit:
+            yield self.env.timeout(1)
+            waited += 1
+
+        if car.current_zone != from_zone:
+            log.warning("Cannot move car %s: not in %s at t=%.1f (is in %s)",
+                        car_id, from_zone, self.env.now, car.current_zone)
             return
         
         # Request staff
@@ -290,36 +302,40 @@ class ValetSimulation:
             if car.ready_time and car.pickup_time:
                 wait = car.ready_time - car.pickup_time  # negative = car ready early (good)
                 wait_times.append(wait)
-        avg_wait = np.mean(wait_times) if wait_times else 0
-        
+        avg_wait = float(np.mean(wait_times)) if wait_times else 0.0
+
         # Staff utilization (simplified)
         total_staff_time = sum(event[2].get("duration", 0) for event in self.staff_events if event[1] == "end_move")
-        total_staff_hours_used = total_staff_time / 60
-        
+        total_staff_hours_used = float(total_staff_time) / 60.0
+
         # Zone max occupancy (approximation)
         zone_max_occupancy = {}
         for zone_name, container in self.zones.items():
-            # SimPy doesn't track historical occupancy easily, so approximate
-            zone_max_occupancy[zone_name] = container.capacity - container.level
-        
+            zone_max_occupancy[zone_name] = int(container.capacity - container.level)
+
         # KPI summary
         kpi_summary = {
-            "service_level_pct": service_level,
-            "avg_wait_time_min": avg_wait,
-            "total_violations": len(self.violations),
-            "staff_hours_used": total_staff_hours_used,
+            "service_level_pct": float(service_level),
+            "avg_wait_time_min": float(avg_wait),
+            "total_violations": int(len(self.violations)),
+            "staff_hours_used": float(total_staff_hours_used),
         }
-        
+
         return SimulationResult(
-            run_id=self.run_id,
-            service_level=service_level,
-            avg_customer_wait_time=avg_wait,
-            staff_utilization={"overall": min(100, total_staff_hours_used / (settings.MAX_STAFF * 24) * 100)},
+            run_id=int(self.run_id),
+            service_level=float(service_level),
+            avg_customer_wait_time=float(avg_wait),
+            staff_utilization={"overall": float(min(100, total_staff_hours_used / (settings.MAX_STAFF * 24) * 100))},
             zone_max_occupancy=zone_max_occupancy,
-            total_staff_hours_used=total_staff_hours_used,
+            total_staff_hours_used=float(total_staff_hours_used),
             violations=self.violations,
             kpi_summary=kpi_summary
         )
+
+
+def _f(v) -> float:
+    """Convert numpy scalar to plain Python float for JSON serialisation."""
+    return float(v)
 
 
 def run_monte_carlo_simulation(
@@ -355,34 +371,34 @@ def run_monte_carlo_simulation(
         "results": [r.to_dict() for r in results],
         "summary": {
             "service_level": {
-                "mean": np.mean(service_levels),
-                "std": np.std(service_levels),
-                "min": np.min(service_levels),
-                "max": np.max(service_levels),
-                "p95": np.percentile(service_levels, 95),
+                "mean": _f(np.mean(service_levels)),
+                "std":  _f(np.std(service_levels)),
+                "min":  _f(np.min(service_levels)),
+                "max":  _f(np.max(service_levels)),
+                "p95":  _f(np.percentile(service_levels, 95)),
             },
             "avg_wait_time": {
-                "mean": np.mean(wait_times),
-                "std": np.std(wait_times), 
-                "min": np.min(wait_times),
-                "max": np.max(wait_times),
+                "mean": _f(np.mean(wait_times)),
+                "std":  _f(np.std(wait_times)),
+                "min":  _f(np.min(wait_times)),
+                "max":  _f(np.max(wait_times)),
             },
             "staff_hours": {
-                "mean": np.mean(staff_hours),
-                "std": np.std(staff_hours),
-                "min": np.min(staff_hours),
-                "max": np.max(staff_hours),
+                "mean": _f(np.mean(staff_hours)),
+                "std":  _f(np.std(staff_hours)),
+                "min":  _f(np.min(staff_hours)),
+                "max":  _f(np.max(staff_hours)),
             },
             "violations": {
-                "mean": np.mean(violation_counts),
-                "std": np.std(violation_counts),
-                "max": np.max(violation_counts),
-                "total_across_runs": sum(violation_counts),
+                "mean":              _f(np.mean(violation_counts)),
+                "std":               _f(np.std(violation_counts)),
+                "max":               _f(np.max(violation_counts)),
+                "total_across_runs": int(sum(violation_counts)),
             }
         },
         "recommendations": _generate_recommendations(results)
     }
-    
+
     return aggregated
 
 
