@@ -1,111 +1,246 @@
 {% extends "base.html" %}
 
-{% block title %}Emil Isavia - Simulation{% endblock %}
+{% block title %}Emil Isavia — Simulation & Evaluation{% endblock %}
 
 {% block content %}
-<div class="row">
+
+<div class="row mb-4">
     <div class="col-12">
-        <h1><i class="fas fa-flask text-info"></i> Valet Simulation</h1>
-        <p class="lead text-muted">Stress-test optimization results under stochastic conditions</p>
+        <h1 class="mb-1">Simulation &amp; Evaluation</h1>
+        <p class="text-muted mb-0">
+            Stress-test optimization results · Compare against baseline · Explore uncertainty
+        </p>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="fas fa-play-circle"></i> Simulation Parameters</h5>
-            </div>
+
+    <!-- Left: Sim Config -->
+    <div class="col-lg-5">
+
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-sliders-h"></i> Parameters</div>
             <div class="card-body">
-                <form id="simulationForm">
-                    <div class="mb-3">
-                        <label class="form-label">Number of Simulation Runs</label>
-                        <select class="form-control" id="numRuns">
-                            <option value="5">5 runs (fast)</option>
-                            <option value="10" selected>10 runs (default)</option>
-                            <option value="20">20 runs (thorough)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Simulation Duration (hours)</label>
-                        <input type="number" class="form-control" id="duration" value="24" min="1" max="72">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Flight Delay Std Dev (minutes)</label>
-                        <input type="number" class="form-control" id="delayStd" value="15" min="0" max="60">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Drive Time Variability</label>
-                        <input type="number" class="form-control" id="driveStd" value="0.15" min="0" max="0.5" step="0.01">
-                        <small class="form-text text-muted">Standard deviation as fraction of base time</small>
-                    </div>
-                    
-                    <button type="button" class="btn btn-info" onclick="runSimulation()">
-                        <i class="fas fa-play"></i> Run Simulation
-                    </button>
-                </form>
+                <div class="mb-3">
+                    <label class="form-label">Simulation Runs</label>
+                    <select class="form-control" id="numRuns">
+                        <option value="5">5 runs — fast</option>
+                        <option value="10" selected>10 runs — default</option>
+                        <option value="20">20 runs — thorough</option>
+                        <option value="50">50 runs — high fidelity</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Duration (hours)</label>
+                    <input type="number" class="form-control" id="duration" value="24" min="1" max="72">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Flight Delay Std Dev (minutes)</label>
+                    <input type="number" class="form-control" id="delayStd" value="15" min="0" max="60">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Drive Time Variability</label>
+                    <input type="number" class="form-control" id="driveStd" value="0.15" min="0" max="0.5" step="0.01">
+                    <div class="form-text">Std dev as fraction of base travel time</div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Compare Against</label>
+                    <select class="form-control" id="compareMode">
+                        <option value="none">No comparison</option>
+                        <option value="baseline">Simple baseline (FIFO)</option>
+                    </select>
+                </div>
+                <button class="btn btn-optimize w-100" onclick="runSimulation()" id="simBtn">
+                    <i class="fas fa-play"></i> Run Simulation
+                </button>
             </div>
         </div>
-    </div>
-    
-    <div class="col-lg-6">
+
         <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-chart-line"></i> Simulation Results</h5>
+            <div class="card-header"><i class="fas fa-info-circle"></i> What This Does</div>
+            <div class="card-body text-muted small">
+                <p>
+                    The simulation runs multiple stochastic replications of a day's operations using
+                    a SimPy discrete-event model. Each run introduces random flight delays and drive-time
+                    variability to test how well an optimization plan holds up.
+                </p>
+                <p>
+                    <strong class="text-body">Optimizer vs Baseline:</strong> When comparison is enabled,
+                    the simulation also runs a simple FIFO heuristic (park in nearest available zone,
+                    no forward scheduling) and compares service levels and violations.
+                </p>
+                <p class="mb-0">
+                    <strong class="text-body">Key metric:</strong> Service level = % of cars delivered on time (≥15 min lead time).
+                </p>
             </div>
-            <div class="card-body">
-                <div id="simulationResults" class="text-center text-muted">
-                    <i class="fas fa-flask fa-3x mb-3"></i>
-                    <p>Run a simulation to analyze system performance</p>
-                    <small class="text-muted">Requires optimization results first</small>
+        </div>
+
+    </div>
+
+    <!-- Right: Results -->
+    <div class="col-lg-7">
+
+        <div id="simPlaceholder" class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="fas fa-flask fa-3x mb-3 d-block" style="opacity:0.2;"></i>
+                <p class="mb-1">Configure parameters and run the simulation</p>
+                <small>Go to the <a href="/" class="text-muted">Dashboard</a> to run the optimizer first,
+                then return here to evaluate</small>
+            </div>
+        </div>
+
+        <div id="simResults" style="display:none;">
+
+            <!-- Summary Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-4">
+                    <div class="stat-card">
+                        <div class="stat-value text-success" id="simServiceLevel">—</div>
+                        <div class="stat-label">Service Level</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card">
+                        <div class="stat-value text-danger" id="simViolations">—</div>
+                        <div class="stat-label">Total Violations</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="stat-card">
+                        <div class="stat-value" id="simRuns">—</div>
+                        <div class="stat-label">Runs</div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Optimizer result detail -->
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-cogs"></i> Optimizer Results</div>
+                <div class="card-body">
+                    <div class="result-row">
+                        <div class="result-stat">
+                            <span class="result-value" id="simMeanSL">—</span>
+                            <span class="result-label">Mean service level</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value" id="simMinSL">—</span>
+                            <span class="result-label">Worst run</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value" id="simMaxSL">—</span>
+                            <span class="result-label">Best run</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Baseline comparison (shown only when enabled) -->
+            <div class="card mb-4" id="baselineCard" style="display:none;">
+                <div class="card-header"><i class="fas fa-balance-scale"></i> vs. Baseline (FIFO)</div>
+                <div class="card-body">
+                    <div class="result-row">
+                        <div class="result-stat">
+                            <span class="result-value text-success" id="cmpOptSL">—</span>
+                            <span class="result-label">Optimizer SL</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value text-muted" id="cmpBaseSL">—</span>
+                            <span class="result-label">Baseline SL</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value" id="cmpDelta">—</span>
+                            <span class="result-label">Improvement</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw output -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-terminal"></i> Raw Output</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleRaw()">Toggle</button>
+                </div>
+                <div class="card-body" id="rawOutput" style="display:none;">
+                    <pre class="raw-pre" id="rawPre"></pre>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 function runSimulation() {
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Simulating...';
+    const btn = document.getElementById('simBtn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Simulating…';
     btn.disabled = true;
-    
-    const resultsDiv = document.getElementById('simulationResults');
-    resultsDiv.innerHTML = '<div class="spinner-border"></div><p>Running Monte Carlo simulation...</p>';
-    
-    // Note: This would typically require optimization results first
+
+    document.getElementById('simPlaceholder').style.display = 'none';
+    document.getElementById('simResults').style.display = 'none';
+
     const data = {
         n_runs: parseInt(document.getElementById('numRuns').value),
         duration_hours: parseInt(document.getElementById('duration').value),
-        bookings: [], // Would come from previous optimization
-        optimization_plan: {} // Would come from previous optimization
+        delay_std: parseFloat(document.getElementById('delayStd').value),
+        drive_std: parseFloat(document.getElementById('driveStd').value),
+        bookings: [],
+        optimization_plan: {}
     };
-    
-    // Simulate API call (will fail without proper data)
-    setTimeout(() => {
-        resultsDiv.innerHTML = `
-            <div class="alert alert-warning">
-                <h6>Simulation Setup Required</h6>
-                <p>To run simulation:</p>
-                <ol class="text-start">
-                    <li>Generate bookings from the main dashboard</li>
-                    <li>Run optimization to get a staff schedule</li>
-                    <li>Return here to simulate that plan</li>
-                </ol>
-                <a href="/" class="btn btn-sm btn-primary">Go to Dashboard</a>
-            </div>
-        `;
-        
-        btn.innerHTML = originalText;
+
+    fetch('/api/simulate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        document.getElementById('simResults').style.display = 'block';
+        const s = res.simulation_result || {};
+        const summary = s.summary || {};
+        const sl = summary.service_level || {};
+        const viol = summary.violations || {};
+
+        document.getElementById('simServiceLevel').textContent  = sl.mean != null ? sl.mean.toFixed(1) + '%' : '—';
+        document.getElementById('simViolations').textContent    = viol.total_across_runs != null ? viol.total_across_runs : '—';
+        document.getElementById('simRuns').textContent          = s.n_runs || data.n_runs;
+        document.getElementById('simMeanSL').textContent        = sl.mean  != null ? sl.mean.toFixed(1)  + '%' : '—';
+        document.getElementById('simMinSL').textContent         = sl.min   != null ? sl.min.toFixed(1)   + '%' : '—';
+        document.getElementById('simMaxSL').textContent         = sl.max   != null ? sl.max.toFixed(1)   + '%' : '—';
+
+        document.getElementById('rawPre').textContent = JSON.stringify(res, null, 2);
+
+        showToast('Simulation complete · ' + (s.n_runs || data.n_runs) + ' runs', 'success');
+    })
+    .catch(e => {
+        document.getElementById('simPlaceholder').style.display = 'block';
+        showToast('Simulation failed: ' + e.message, 'danger');
+    })
+    .finally(() => {
+        btn.innerHTML = '<i class="fas fa-play"></i> Run Simulation';
         btn.disabled = false;
-    }, 2000);
+    });
+}
+
+function toggleRaw() {
+    const el = document.getElementById('rawOutput');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function showToast(msg, type) {
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} alert-dismissible fade show`;
+    el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px;font-size:0.84rem;';
+    el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
 }
 </script>
 {% endblock %}

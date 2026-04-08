@@ -1,346 +1,291 @@
 {% extends "base.html" %}
 
-{% block title %}Emil Isavia - Valet Dashboard{% endblock %}
+{% block title %}Emil Isavia — Valet Operations{% endblock %}
 
 {% block content %}
+
+<!-- Page Header -->
 <div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h1><i class="fas fa-car text-primary"></i> Premium Valet Operations</h1>
-                <p class="text-muted mb-0">Keflavík Airport valet parking optimization &amp; simulation</p>
-            </div>
-            <div class="btn-group">
-                <button class="btn btn-outline-primary" onclick="refreshSystemStatus()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-                <button class="btn btn-outline-info" onclick="loadHelp()">
-                    <i class="fas fa-question-circle"></i> Help
-                </button>
-            </div>
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="mb-1">Valet Operations</h1>
+            <p class="text-muted mb-0">Keflavík Airport · Premium Valet Optimizer</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="status-pill" id="apiPill">
+                <span class="status-dot" id="apiDot"></span>
+                <span id="apiLabel">Checking...</span>
+            </span>
+            <button class="btn btn-outline-secondary btn-sm" onclick="refreshAll()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
         </div>
     </div>
 </div>
 
-<!-- System Status Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <h6 class="card-title text-success">
-                    <i class="fas fa-car"></i> Parking API
-                </h6>
-                <h4 id="parkingApiStatus" class="mb-0">
-                    <div class="spinner-border spinner-border-sm"></div>
-                </h4>
-                <small class="text-muted">Real bookings</small>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card border-warning">
-            <div class="card-body text-center">
-                <h6 class="card-title text-warning">
-                    <i class="fas fa-cogs"></i> Optimizer
-                </h6>
-                <h4 id="optimizerStatus" class="mb-0">
-                    <div class="spinner-border spinner-border-sm"></div>
-                </h4>
-                <small class="text-muted">GurobiPy/heuristic</small>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <h6 class="card-title text-info">
-                    <i class="fas fa-flask"></i> Simulator
-                </h6>
-                <h4 id="simulatorStatus" class="mb-0">
-                    <div class="spinner-border spinner-border-sm"></div>
-                </h4>
-                <small class="text-muted">SimPy</small>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <h6 class="card-title text-primary">
-                    <i class="fas fa-users"></i> Max Staff
-                </h6>
-                <h4 id="maxStaff" class="mb-0">10</h4>
-                <small class="text-muted">Available</small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Main Workflow -->
+<!-- Main Two-Column Layout -->
 <div class="row">
-    <div class="col-lg-8">
-        <!-- Step 1: Generate Bookings -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <span class="badge bg-light text-primary me-2">1</span>
-                    <i class="fas fa-calendar-plus"></i> Generate Valet Bookings
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Pull flight data and generate Premium valet customer bookings.</p>
-                
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Date</label>
-                        <input type="date" class="form-control" id="bookingDate" value="">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Data Source</label>
-                        <select class="form-control" id="dataSource" onchange="toggleCustomerCount()">
-                            <option value="real">Real Parking API</option>
-                            <option value="mock">Mock Flight Data</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6" id="numCustomersField" style="display: none;">
-                        <label class="form-label">Number of Customers</label>
-                        <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
-                        <small class="text-muted">Simulated bookings to generate</small>
-                    </div>
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button class="btn btn-primary" onclick="generateBookings()">
-                        <i class="fas fa-download"></i> Generate Bookings
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="loadSampleBookings()" disabled>
-                        <i class="fas fa-file-import"></i> Load Sample
-                    </button>
-                </div>
-                
-                <div id="bookingsResult" class="mt-3" style="display: none;">
-                    <div class="alert alert-success">
-                        <strong>Generated:</strong> <span id="bookingsCount">0</span> bookings
-                        <button class="btn btn-sm btn-outline-success ms-2" onclick="previewBookings()">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Step 2: Optimization -->
-        <div class="card mb-4">
-            <div class="card-header bg-warning text-white">
-                <h5 class="mb-0">
-                    <span class="badge bg-light text-warning me-2">2</span>
-                    <i class="fas fa-cogs"></i> Run Optimization
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Optimize staff scheduling and car movements to minimize cost while meeting service levels.</p>
-                
-                <button class="btn btn-warning" onclick="runOptimization()" id="optimizeBtn" disabled>
-                    <i class="fas fa-play"></i> Optimize Operations
-                </button>
-                <small class="text-muted ms-2">Requires bookings from step 1</small>
-                
-                <div id="optimizationResult" class="mt-3" style="display: none;">
-                    <div class="alert alert-warning">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Optimized:</strong> 
-                                <span id="staffHours">0</span> staff-hours, 
-                                <span id="carMoves">0</span> moves
-                            </div>
-                            <button class="btn btn-sm btn-outline-warning" onclick="showOptimizationDetails()">
-                                <i class="fas fa-chart-bar"></i> Details
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Step 3: Simulation -->
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">
-                    <span class="badge bg-light text-info me-2">3</span>
-                    <i class="fas fa-flask"></i> Run Simulation
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Stress-test the optimized plan under stochastic conditions (delays, variability).</p>
-                
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Simulation Runs</label>
-                        <select class="form-control" id="simRuns">
-                            <option value="5">5 runs (fast)</option>
-                            <option value="10" selected>10 runs (default)</option>
-                            <option value="20">20 runs (thorough)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Duration (hours)</label>
-                        <input type="number" class="form-control" id="simDuration" value="24" min="1" max="72">
-                    </div>
-                </div>
-                
-                <button class="btn btn-info" onclick="runSimulation()" id="simulateBtn" disabled>
-                    <i class="fas fa-play"></i> Run Simulation
-                </button>
-                <small class="text-muted ms-2">Requires optimization from step 2</small>
-                
-                <div id="simulationResult" class="mt-3" style="display: none;">
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>Service Level:</strong> <span id="serviceLevel">0</span>%
-                                <strong class="ms-3">Violations:</strong> <span id="violations">0</span>
-                            </div>
-                            <button class="btn btn-sm btn-outline-info" onclick="showSimulationDetails()">
-                                <i class="fas fa-microscope"></i> Details
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Sidebar -->
-    <div class="col-lg-4">
-        <!-- Zone Layout -->
+
+    <!-- LEFT: Optimization Panel (primary) -->
+    <div class="col-lg-7">
+
+        <!-- Booking Controls -->
         <div class="card mb-4">
             <div class="card-header">
-                <h6><i class="fas fa-map-marked-alt"></i> Valet Zone Layout</h6>
+                <i class="fas fa-calendar-alt"></i> Booking Input
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-sm-5">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" id="bookingDate">
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label">Source</label>
+                        <select class="form-control" id="dataSource" onchange="toggleCustomerCount()">
+                            <option value="real">Real Parking API</option>
+                            <option value="mock">Mock Data</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-3" id="numCustomersField" style="display:none;">
+                        <label class="form-label">Customers</label>
+                        <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="generateBookings()" id="generateBtn">
+                            <i class="fas fa-download"></i> Load Bookings
+                        </button>
+                        <span class="ms-3 text-muted small" id="bookingsMeta" style="display:none;">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span id="bookingsCount">0</span> bookings loaded ·
+                            <button class="btn btn-link btn-sm p-0" onclick="previewBookings()">Preview</button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optimization — Primary Feature -->
+        <div class="card mb-4 optimize-card">
+            <div class="card-header optimize-header">
+                <i class="fas fa-cogs"></i> Optimization
+                <span class="ms-2 badge optimizer-badge" id="optimizerBadge">Heuristic</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Compute the minimum-cost staff schedule and car movement plan for the day.
+                    Run this as often as needed — each run produces a fresh plan.
+                </p>
+
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <button class="btn btn-optimize" onclick="runOptimization()" id="optimizeBtn">
+                        <i class="fas fa-play"></i> Run Optimizer
+                    </button>
+                    <span class="text-muted small" id="optimizeRequires" style="display:none;">
+                        Load bookings first
+                    </span>
+                </div>
+
+                <!-- Results (hidden until run) -->
+                <div id="optimizationResult" style="display:none;">
+                    <div class="result-row">
+                        <div class="result-stat">
+                            <span class="result-value" id="staffHours">—</span>
+                            <span class="result-label">Staff-hours</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value" id="carMoves">—</span>
+                            <span class="result-label">Car moves</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-stat">
+                            <span class="result-value text-success" id="optimizeStatus">—</span>
+                            <span class="result-label">Status</span>
+                        </div>
+                        <div class="ms-auto">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="showOptimizationDetails()">
+                                <i class="fas fa-table"></i> Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Staff Schedule Table -->
+                    <div id="scheduleTableWrap" class="mt-3" style="display:none;">
+                        <h6 class="text-muted small mb-2 text-uppercase ls-1">Staff Schedule</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm schedule-table">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Move</th>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Car</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduleTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="optimizePlaceholder" class="text-center text-muted py-4 small">
+                    <i class="fas fa-cogs fa-2x mb-2 d-block" style="opacity:0.2;"></i>
+                    Load bookings, then run the optimizer
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats Bar -->
+        <div class="row g-3 mb-4">
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="statBookings">—</div>
+                    <div class="stat-label">Bookings</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="statHours">—</div>
+                    <div class="stat-label">Staff-hours</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="stat-card">
+                    <div class="stat-value" id="statMoves">—</div>
+                    <div class="stat-label">Car moves</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT: Live Feed -->
+    <div class="col-lg-5">
+
+        <!-- Live Occupancy -->
+        <div class="card mb-4">
+            <div class="card-header live-card-header">
+                <span>
+                    <span class="live-dot"></span>
+                    Live Occupancy
+                </span>
+                <small id="liveTimestamp" class="text-muted-light">Loading…</small>
+            </div>
+            <div class="card-body p-0">
+
+                <div class="zone-row zone-reception" id="zoneReception">
+                    <div class="zone-info">
+                        <span class="zone-name">Reception</span>
+                        <span class="zone-cap">/ 14</span>
+                    </div>
+                    <div class="zone-bar-wrap">
+                        <div class="zone-bar">
+                            <div class="zone-fill zone-fill-blue" id="fillReception" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <span class="zone-count" id="countReception">—</span>
+                </div>
+
+                <div class="zone-row zone-gull" id="zoneGull">
+                    <div class="zone-info">
+                        <span class="zone-name">Gull Storage</span>
+                        <span class="zone-cap">/ 50</span>
+                    </div>
+                    <div class="zone-bar-wrap">
+                        <div class="zone-bar">
+                            <div class="zone-fill zone-fill-amber" id="fillGull" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <span class="zone-count" id="countGull">—</span>
+                </div>
+
+                <div class="zone-row zone-p3" id="zoneP3">
+                    <div class="zone-info">
+                        <span class="zone-name">P3 Storage</span>
+                        <span class="zone-cap">/ 150</span>
+                    </div>
+                    <div class="zone-bar-wrap">
+                        <div class="zone-bar">
+                            <div class="zone-fill zone-fill-slate" id="fillP3" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <span class="zone-count" id="countP3">—</span>
+                </div>
+
+                <div class="zone-row zone-delivery" id="zoneDelivery">
+                    <div class="zone-info">
+                        <span class="zone-name">Delivery</span>
+                        <span class="zone-cap">/ 20</span>
+                    </div>
+                    <div class="zone-bar-wrap">
+                        <div class="zone-bar">
+                            <div class="zone-fill zone-fill-green" id="fillDelivery" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <span class="zone-count" id="countDelivery">—</span>
+                </div>
+
+                <div class="px-3 pb-3 pt-1">
+                    <a href="/live-feed" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="fas fa-external-link-alt"></i> Full Live Feed
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zone Layout Reference -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-map-marked-alt"></i> Zone Layout
             </div>
             <div class="card-body">
                 <div class="zone-diagram">
-                    <!-- Reception -->
                     <div class="zone-box reception mb-2">
-                        <strong>Reception</strong><br>
-                        <small>14 spots | Customer drop-off</small>
+                        <strong>Reception</strong>
+                        <small>14 spots · Customer drop-off</small>
                     </div>
-                    
+                    <div class="zone-arrows mb-2">
+                        <span class="zone-arrow-label">3 min →</span>
+                        <span class="zone-arrow-label ms-4">8 min →</span>
+                    </div>
                     <div class="d-flex gap-2 mb-2">
-                        <!-- Gull -->
                         <div class="zone-box gull flex-1">
-                            <strong>Gull Storage</strong><br>
-                            <small>50 spots | 3 min drive</small>
+                            <strong>Gull</strong>
+                            <small>50 spots · 4 min to delivery</small>
                         </div>
-                        <!-- P3 -->
                         <div class="zone-box p3 flex-1">
-                            <strong>P3 Storage</strong><br>
-                            <small>150 spots | 8 min drive</small>
+                            <strong>P3</strong>
+                            <small>150 spots · 9 min to delivery</small>
                         </div>
                     </div>
-                    
-                    <!-- Delivery -->
                     <div class="zone-box delivery">
-                        <strong>Delivery</strong><br>
-                        <small>20 spots | Customer pickup</small>
+                        <strong>Delivery</strong>
+                        <small>20 spots · ≥15 min lead time</small>
                     </div>
-                </div>
-                
-                <hr>
-                <h6>Travel Times</h6>
-                <ul class="list-unstyled small">
-                    <li><strong>Reception → Gull:</strong> 3 min + 5 min walk back</li>
-                    <li><strong>Reception → P3:</strong> 8 min + 12 min walk back</li>
-                    <li><strong>Gull → Delivery:</strong> 4 min + 6 min walk back</li>
-                    <li><strong>P3 → Delivery:</strong> 9 min + 13 min walk back</li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Live Feed -->
-        <div class="card mb-4">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0"><i class="fas fa-broadcast-tower"></i> Live Feed</h6>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">Real-time parking occupancy monitoring</p>
-                <div class="row text-center small">
-                    <div class="col-6">
-                        <div class="border rounded p-2 mb-2">
-                            <strong>Reception</strong><br>
-                            <span class="text-primary" id="live-reception">-/-</span>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2 mb-2">
-                            <strong>Delivery</strong><br>
-                            <span class="text-success" id="live-delivery">-/-</span>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <strong>Gull</strong><br>
-                            <span class="text-warning" id="live-gull">-/-</span>
-                        </div>
-                    </div>
-                    <div class="col-6">
-                        <div class="border rounded p-2">
-                            <strong>P3</strong><br>
-                            <span class="text-info" id="live-p3">-/-</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-grid gap-2 mt-3">
-                    <a href="/live-feed" class="btn btn-success btn-sm">
-                        <i class="fas fa-external-link-alt"></i> View Live Feed
-                    </a>
-                </div>
-                <small class="text-muted d-block mt-2 text-center" id="live-updated">Loading...</small>
-            </div>
-        </div>
-        
-        <!-- Recent Results -->
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-history"></i> Quick Stats</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6">
-                        <h5 class="text-primary mb-0" id="totalBookings">0</h5>
-                        <small class="text-muted">Bookings</small>
-                    </div>
-                    <div class="col-6">
-                        <h5 class="text-warning mb-0" id="totalStaffHours">0</h5>
-                        <small class="text-muted">Staff Hours</small>
-                    </div>
-                </div>
-                <hr>
-                <div class="row text-center">
-                    <div class="col-6">
-                        <h5 class="text-info mb-0" id="avgServiceLevel">-</h5>
-                        <small class="text-muted">Service Level</small>
-                    </div>
-                    <div class="col-6">
-                        <h5 class="text-success mb-0" id="totalMoves">0</h5>
-                        <small class="text-muted">Car Moves</small>
-                    </div>
-                </div>
-                
-                <div class="mt-3 pt-3 border-top">
-                    <small class="text-muted">
-                        <i class="fas fa-info-circle"></i>
-                        Service level target: ≥95% cars ready on time
-                    </small>
                 </div>
             </div>
         </div>
+
+        <!-- Evaluation Link -->
+        <div class="card eval-card">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="fas fa-flask eval-icon"></i>
+                <div>
+                    <div class="fw-600 small">Simulation & Evaluation</div>
+                    <div class="text-muted small">Compare optimizer vs baseline · stress-test under uncertainty</div>
+                </div>
+                <a href="/simulate" class="btn btn-sm btn-outline-secondary ms-auto text-nowrap">
+                    Open <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- Modals -->
+<!-- Bookings Preview Modal -->
 <div class="modal fade" id="bookingsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -355,13 +300,12 @@
                             <tr>
                                 <th>Booking ID</th>
                                 <th>Car Plate</th>
-                                <th>Drop-off Time</th>
-                                <th>Return Time</th>
+                                <th>Drop-off</th>
+                                <th>Return</th>
                                 <th>Duration</th>
                             </tr>
                         </thead>
-                        <tbody id="bookingsTableBody">
-                        </tbody>
+                        <tbody id="bookingsTableBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -372,376 +316,233 @@
     </div>
 </div>
 
-<div class="modal fade" id="helpModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">How to Use Emil Isavia</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <h6>1. Generate Bookings</h6>
-                <p>Pull real flight data from external APIs to create Premium valet customer bookings. Each booking represents a customer who will drop off their car before departure and expect it ready when they return.</p>
-                
-                <h6>2. Run Optimization</h6>
-                <p>Use GurobiPy to solve the staff scheduling and car movement problem. The optimizer decides which storage zone each car goes to and when all moves should happen, minimizing total staff time while ensuring cars are ready on time.</p>
-                
-                <h6>3. Simulate Operations</h6>
-                <p>Test the optimized plan using SimPy discrete-event simulation. This adds realistic delays, variability, and stochastic elements to validate the plan works under real conditions.</p>
-                
-                <h6>Key Constraints</h6>
-                <ul>
-                    <li>Cars must be at Delivery ≥15 minutes before customer returns</li>
-                    <li>Zone capacities: Reception(14), Gull(50), P3(150), Delivery(20)</li>
-                    <li>Limited staff (max 10) with realistic travel/walk times</li>
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it!</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Global state
 let currentBookings = null;
 let currentOptimization = null;
-let currentSimulation = null;
 
-// Show/hide customer count based on data source
-function toggleCustomerCount() {
-    const source = document.getElementById('dataSource').value;
-    document.getElementById('numCustomersField').style.display = source === 'mock' ? 'block' : 'none';
-}
-
-// Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-    // Set today's date
     document.getElementById('bookingDate').value = new Date().toISOString().split('T')[0];
-
-    // Set initial field visibility
     toggleCustomerCount();
-
-    // Load system status
-    refreshSystemStatus();
-    
-    // Load live feed preview
-    loadLiveFeedPreview();
-    setInterval(loadLiveFeedPreview, 30000); // Update every 30 seconds
+    refreshAll();
+    loadLiveFeed();
+    setInterval(loadLiveFeed, 30000);
 });
 
-// System status
-function refreshSystemStatus() {
+function toggleCustomerCount() {
+    const src = document.getElementById('dataSource').value;
+    document.getElementById('numCustomersField').style.display = src === 'mock' ? 'block' : 'none';
+}
+
+function refreshAll() {
     fetch('/api/status')
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
-            const components = data.components || {};
-            
-            // Update status indicators
-            document.getElementById('parkingApiStatus').innerHTML = getStatusIcon(components.premium_parking_api);
-            document.getElementById('optimizerStatus').innerHTML = getStatusIcon(components.optimization);
-            document.getElementById('simulatorStatus').innerHTML = getStatusIcon(components.simulation);
-            
-            // Update config
-            if (data.config) {
-                document.getElementById('maxStaff').textContent = data.config.max_staff || '10';
+            const c = data.components || {};
+            const apiOk = c.premium_parking_api === 'connected' || c.premium_parking_api === 'premium_api_available';
+            const optMode = c.optimization;
+
+            const dot = document.getElementById('apiDot');
+            const label = document.getElementById('apiLabel');
+            if (apiOk) {
+                dot.className = 'status-dot dot-green';
+                label.textContent = 'API Connected';
+            } else if (c.premium_parking_api === 'error') {
+                dot.className = 'status-dot dot-red';
+                label.textContent = 'API Error';
+            } else {
+                dot.className = 'status-dot dot-amber';
+                label.textContent = 'API Offline';
+            }
+
+            const badge = document.getElementById('optimizerBadge');
+            if (optMode === 'gurobi_available') {
+                badge.textContent = 'Gurobi';
+                badge.className = 'ms-2 badge optimizer-badge-gurobi';
+            } else {
+                badge.textContent = 'Heuristic';
+                badge.className = 'ms-2 badge optimizer-badge';
             }
         })
-        .catch(error => {
-            console.error('Status check failed:', error);
-            document.getElementById('apiStatus').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
-            document.getElementById('optimizerStatus').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
-            document.getElementById('simulatorStatus').innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+        .catch(() => {
+            document.getElementById('apiDot').className = 'status-dot dot-red';
+            document.getElementById('apiLabel').textContent = 'Offline';
         });
 }
 
-function getStatusIcon(status) {
-    switch (status) {
-        case 'connected':
-        case 'premium_api_available':
-        case 'gurobi_available':
-        case 'simpy_available':
-        case 'ready':
-            return '<i class="fas fa-check-circle text-success"></i>';
-        case 'mock_data':
-        case 'mock_data_fallback':
-        case 'heuristic_only':
-            return '<i class="fas fa-exclamation-circle text-warning"></i>';
-        case 'not_configured':
-            return '<i class="fas fa-question-circle text-info"></i>';
-        case 'error':
-        default:
-            return '<i class="fas fa-times-circle text-danger"></i>';
-    }
-}
-
-// Live feed preview
-function loadLiveFeedPreview() {
+function loadLiveFeed() {
     fetch('/api/live-status')
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
-            if (data.success) {
-                const { occupancy, capacities } = data;
-                
-                // Update live feed preview
-                document.getElementById('live-reception').textContent = `${occupancy.reception}/${capacities.reception}`;
-                document.getElementById('live-gull').textContent = `${occupancy.gull}/${capacities.gull}`;
-                document.getElementById('live-p3').textContent = `${occupancy.p3}/${capacities.p3}`;
-                document.getElementById('live-delivery').textContent = `${occupancy.delivery}/${capacities.delivery}`;
-                
-                const timestamp = new Date(data.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
-                document.getElementById('live-updated').textContent = `Updated: ${timestamp}`;
-            } else {
-                // Show error state
-                ['reception', 'gull', 'p3', 'delivery'].forEach(zone => {
-                    document.getElementById(`live-${zone}`).textContent = 'Error';
-                });
-                document.getElementById('live-updated').textContent = 'Connection error';
-            }
+            if (!data.success) throw new Error('feed error');
+            const { occupancy, capacities } = data;
+
+            setZone('Reception', occupancy.reception, capacities.reception, 'fillReception', 'countReception', 'zone-fill-blue');
+            setZone('Gull',      occupancy.gull,      capacities.gull,      'fillGull',      'countGull',      'zone-fill-amber');
+            setZone('P3',        occupancy.p3,         capacities.p3,        'fillP3',         'countP3',        'zone-fill-slate');
+            setZone('Delivery',  occupancy.delivery,   capacities.delivery,  'fillDelivery',  'countDelivery',  'zone-fill-green');
+
+            const ts = new Date(data.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+            document.getElementById('liveTimestamp').textContent = 'Updated ' + ts;
         })
-        .catch(error => {
-            console.error('Live feed preview failed:', error);
-            ['reception', 'gull', 'p3', 'delivery'].forEach(zone => {
-                document.getElementById(`live-${zone}`).textContent = 'N/A';
+        .catch(() => {
+            ['countReception','countGull','countP3','countDelivery'].forEach(id => {
+                document.getElementById(id).textContent = '—';
             });
-            document.getElementById('live-updated').textContent = 'Offline';
+            document.getElementById('liveTimestamp').textContent = 'Offline';
         });
 }
 
-// Step 1: Generate bookings
+function setZone(name, count, cap, fillId, countId, colorClass) {
+    const pct = cap > 0 ? Math.min(100, (count / cap) * 100) : 0;
+    const fill = document.getElementById(fillId);
+    fill.style.width = pct + '%';
+    fill.className = 'zone-fill ' + (pct >= 90 ? 'zone-fill-red' : colorClass);
+    document.getElementById(countId).textContent = count;
+}
+
 function generateBookings() {
-    const btn = document.querySelector('button[onclick="generateBookings()"]');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+    const btn = document.getElementById('generateBtn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading…';
     btn.disabled = true;
-    
+
     const date = document.getElementById('bookingDate').value;
-    const numCustomers = document.getElementById('numCustomers').value;
-    const dataSource = document.getElementById('dataSource').value;
-    const useReal = dataSource === 'real' ? 'true' : 'false';
-    
-    fetch(`/api/bookings?date=${date}&customers=${numCustomers}&use_real=${useReal}`)
-        .then(response => response.json())
+    const src = document.getElementById('dataSource').value;
+    const customers = document.getElementById('numCustomers').value;
+    const useReal = src === 'real' ? 'true' : 'false';
+
+    fetch(`/api/bookings?date=${date}&customers=${customers}&use_real=${useReal}`)
+        .then(r => r.json())
         .then(data => {
-            if (data.success) {
-                currentBookings = data.data;
-                document.getElementById('bookingsCount').textContent = data.count;
-                document.getElementById('bookingsResult').style.display = 'block';
-                document.getElementById('totalBookings').textContent = data.count;
-                
-                // Show data source
-                const sourceText = data.data_source === 'premium_parking_api' ? 
-                    '🔴 Real Premium Parking API' : '🔵 Mock Flight Data';
-                
-                // Enable optimization
-                document.getElementById('optimizeBtn').disabled = false;
-                
-                showSuccess(`Generated ${data.count} valet bookings from ${sourceText}`);
-            } else {
-                showError(`Failed to generate bookings: ${data.error}`);
-            }
+            if (!data.success) throw new Error(data.error || 'Unknown error');
+            currentBookings = data.data;
+            document.getElementById('bookingsCount').textContent = data.count;
+            document.getElementById('bookingsMeta').style.display = 'inline';
+            document.getElementById('statBookings').textContent = data.count;
+            document.getElementById('optimizePlaceholder').innerHTML =
+                '<i class="fas fa-cogs fa-2x mb-2 d-block" style="opacity:0.2;"></i>Bookings ready — click Run Optimizer';
+            showToast(`${data.count} bookings loaded`, 'success');
         })
-        .catch(error => {
-            console.error('Booking generation failed:', error);
-            showError('Failed to generate bookings');
-        })
+        .catch(e => showToast('Failed to load bookings: ' + e.message, 'danger'))
         .finally(() => {
-            btn.innerHTML = originalText;
+            btn.innerHTML = '<i class="fas fa-download"></i> Load Bookings';
             btn.disabled = false;
         });
 }
 
 function previewBookings() {
     if (!currentBookings) return;
-    
     const tbody = document.getElementById('bookingsTableBody');
     tbody.innerHTML = '';
-    
-    currentBookings.slice(0, 20).forEach(booking => {  // Show first 20
-        const row = `
-            <tr>
-                <td>${booking.booking_id}</td>
-                <td>${booking.car_plate}</td>
-                <td>${formatDateTime(booking.departure_time)}</td>
-                <td>${formatDateTime(booking.arrival_time)}</td>
-                <td>${calculateDuration(booking.departure_time, booking.arrival_time)}</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
+    currentBookings.slice(0, 20).forEach(b => {
+        tbody.innerHTML += `<tr>
+            <td>${b.booking_id}</td>
+            <td>${b.car_plate}</td>
+            <td>${fmt(b.departure_time)}</td>
+            <td>${fmt(b.arrival_time)}</td>
+            <td>${dur(b.departure_time, b.arrival_time)}</td>
+        </tr>`;
     });
-    
     new bootstrap.Modal(document.getElementById('bookingsModal')).show();
 }
 
-// Step 2: Run optimization
 function runOptimization() {
     if (!currentBookings) {
-        showError('No bookings available. Generate bookings first.');
+        showToast('Load bookings first', 'warning');
         return;
     }
-    
     const btn = document.getElementById('optimizeBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing…';
     btn.disabled = true;
-    
-    const requestData = {
-        bookings: currentBookings,
-        base_time: document.getElementById('bookingDate').value + 'T00:00:00'
-    };
-    
+    document.getElementById('optimizePlaceholder').style.display = 'none';
+
     fetch('/api/optimize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData)
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            bookings: currentBookings,
+            base_time: document.getElementById('bookingDate').value + 'T00:00:00'
+        })
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            currentOptimization = data.optimization_result;
-            
-            // Update display
-            document.getElementById('staffHours').textContent = currentOptimization.total_staff_hours.toFixed(1);
-            document.getElementById('carMoves').textContent = currentOptimization.car_movements.length;
-            document.getElementById('optimizationResult').style.display = 'block';
-            document.getElementById('totalStaffHours').textContent = currentOptimization.total_staff_hours.toFixed(1);
-            document.getElementById('totalMoves').textContent = currentOptimization.car_movements.length;
-            
-            // Enable simulation
-            document.getElementById('simulateBtn').disabled = false;
-            
-            showSuccess(`Optimization completed: ${currentOptimization.status}`);
-        } else {
-            showError(`Optimization failed: ${data.error}`);
+        if (!data.success) throw new Error(data.error || 'Unknown error');
+        currentOptimization = data.optimization_result;
+        const res = currentOptimization;
+
+        document.getElementById('staffHours').textContent = res.total_staff_hours.toFixed(1);
+        document.getElementById('carMoves').textContent = res.car_movements.length;
+        document.getElementById('optimizeStatus').textContent = res.status;
+        document.getElementById('statHours').textContent = res.total_staff_hours.toFixed(1);
+        document.getElementById('statMoves').textContent = res.car_movements.length;
+
+        document.getElementById('optimizationResult').style.display = 'block';
+        document.getElementById('optimizePlaceholder').style.display = 'none';
+
+        // Populate schedule table
+        const tbody = document.getElementById('scheduleTableBody');
+        tbody.innerHTML = '';
+        const moves = res.car_movements || [];
+        if (moves.length > 0) {
+            moves.slice(0, 30).forEach(m => {
+                tbody.innerHTML += `<tr>
+                    <td>${fmtTime(m.time || m.start_time || '—')}</td>
+                    <td><span class="move-badge">Move</span></td>
+                    <td>${m.from_zone || '—'}</td>
+                    <td>${m.to_zone || '—'}</td>
+                    <td class="text-muted">${m.car_plate || m.booking_id || '—'}</td>
+                </tr>`;
+            });
+            document.getElementById('scheduleTableWrap').style.display = 'block';
         }
+
+        showToast('Optimization complete · ' + res.status, 'success');
     })
-    .catch(error => {
-        console.error('Optimization failed:', error);
-        showError('Optimization failed');
+    .catch(e => {
+        document.getElementById('optimizePlaceholder').style.display = 'block';
+        showToast('Optimization failed: ' + e.message, 'danger');
     })
     .finally(() => {
-        btn.innerHTML = originalText;
+        btn.innerHTML = '<i class="fas fa-play"></i> Run Optimizer';
         btn.disabled = false;
     });
 }
 
-// Step 3: Run simulation
-function runSimulation() {
-    if (!currentBookings || !currentOptimization) {
-        showError('Optimization required before simulation.');
-        return;
-    }
-    
-    const btn = document.getElementById('simulateBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Simulating...';
-    btn.disabled = true;
-    
-    const requestData = {
-        bookings: currentBookings,
-        optimization_plan: currentOptimization,
-        base_time: document.getElementById('bookingDate').value + 'T00:00:00',
-        n_runs: parseInt(document.getElementById('simRuns').value),
-        duration_hours: parseInt(document.getElementById('simDuration').value)
-    };
-    
-    fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentSimulation = data.simulation_result;
-            const summary = currentSimulation.summary;
-            
-            // Update display
-            document.getElementById('serviceLevel').textContent = summary.service_level.mean.toFixed(1);
-            document.getElementById('violations').textContent = summary.violations.total_across_runs;
-            document.getElementById('simulationResult').style.display = 'block';
-            document.getElementById('avgServiceLevel').textContent = summary.service_level.mean.toFixed(1) + '%';
-            
-            showSuccess(`Simulation completed: ${currentSimulation.n_runs} runs`);
-        } else {
-            showError(`Simulation failed: ${data.error}`);
-        }
-    })
-    .catch(error => {
-        console.error('Simulation failed:', error);
-        showError('Simulation failed');
-    })
-    .finally(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-}
-
-// Helper functions
-function formatDateTime(isoString) {
-    const date = new Date(isoString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
-}
-
-function calculateDuration(start, end) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const hours = Math.round((endDate - startDate) / (1000 * 60 * 60));
-    
-    if (hours < 24) return `${hours}h`;
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    return `${days}d ${remainingHours}h`;
-}
-
-function showSuccess(message) {
-    showAlert(message, 'success');
-}
-
-function showError(message) {
-    showAlert(message, 'danger');
-}
-
-function showAlert(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.querySelector('main').insertBefore(alertDiv, document.querySelector('main').firstChild);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 5000);
-}
-
-// Detail views (placeholder)
 function showOptimizationDetails() {
-    window.open('/optimize', '_blank');
+    document.getElementById('scheduleTableWrap').style.display =
+        document.getElementById('scheduleTableWrap').style.display === 'none' ? 'block' : 'none';
 }
 
-function showSimulationDetails() {
-    window.open('/simulate', '_blank');
+function fmt(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
 }
 
-// Help
-function loadHelp() {
-    new bootstrap.Modal(document.getElementById('helpModal')).show();
+function fmtTime(iso) {
+    if (!iso || iso === '—') return '—';
+    try {
+        const d = new Date(iso);
+        return d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+    } catch { return iso; }
 }
 
-// Sample bookings (placeholder)
-function loadSampleBookings() {
-    // Could implement loading of predefined sample data
+function dur(start, end) {
+    const h = Math.round((new Date(end) - new Date(start)) / 3600000);
+    if (h < 24) return h + 'h';
+    const d = Math.floor(h / 24);
+    return d + 'd ' + (h % 24) + 'h';
+}
+
+function showToast(msg, type) {
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} alert-dismissible fade show`;
+    el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px;font-size:0.84rem;';
+    el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
 }
 </script>
-
-
 {% endblock %}

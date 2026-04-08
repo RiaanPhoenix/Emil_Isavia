@@ -91,6 +91,10 @@ app.py                      # Main Flask entrypoint
 
 | Hash | Message |
 |---|---|
+| `5bb878b` | Fix: mock bookings now vary by date (was using fixed random seed) |
+| `8d690c5` | UX: hide customer count field when using real parking API |
+| `4ff0ae2` | Fix: numpy int64 JSON serialisation error and simulation zone-sync bug |
+| `ade8d1f` | Redesign: clean professional UI — navy/slate palette, Inter typography, refined layout |
 | `fd58abb` | Add live feed functionality for real-time parking occupancy monitoring |
 | `f928da2` | INTEGRATED: Premium Parking API Connection |
 | `71bb1b1` | CORRECTED: Implement actual problem — Isavia Premium Valet Parking |
@@ -101,24 +105,34 @@ app.py                      # Main Flask entrypoint
 ## Current State (2026-03-28)
 
 - Full optimization + simulation pipeline functional
-- Real parking API integrated (`parking_api.py`)
+- Real parking API integrated (`parking_api.py`) — credentials not yet set
 - Live feed for real-time occupancy monitoring added
 - GurobiPy with heuristic fallback (no license required for dev)
 - Flight data: OpenSky (free), AviationStack, AirLabs supported
 - Frontend: 3-step workflow (Generate → Optimize → Simulate)
+- UI fully redesigned — navy/slate palette, Inter font, professional look
 
 ---
 
 ## Known Issues / TODOs
 
-- [ ] No `.env.example` confirmed present — verify API key setup
+- [ ] Real Parking API not connecting — needs `PARKING_API_USERNAME` + `PARKING_API_PASSWORD` in `.env`
 - [ ] Gurobi license not available in dev; heuristic fallback in use
 - [ ] Tests in `tests/` — coverage status unknown
 - [ ] Docker setup in README but not verified
 
 ---
 
+## Bugs Fixed (2026-03-28)
+
+- **numpy int64 JSON crash** — simulation returned numpy scalar types; fixed by casting all to `float()`/`int()` before response
+- **Simulation zone-sync** — planned moves fired before car arrived at source zone; fixed with up-to-60-min tolerance wait
+- **Mock data fixed seed** — all dates returned identical bookings; fixed by seeding RNG from date (`YYYYMMDD`)
+- **Customer count field** — shown even when using real API; now hidden unless Mock mode selected
+
+---
+
 ## Notes
 
-- Emil will be working on this project heavily going forward
-- First memory file created: 2026-03-28
+- Emil working on this project heavily
+- Memory file created: 2026-03-28
