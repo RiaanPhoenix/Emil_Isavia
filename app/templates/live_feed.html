@@ -2,409 +2,677 @@
 
 {% block title %}Live Feed - Emil Isavia{% endblock %}
 
-{% block head %}{% endblock %}
+{% block head %}
+<style>
+  /* ── Layout ── */
+  .lf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .lf-header h1 { font-size: 1.5rem; margin: 0; }
+  .lf-meta { font-size: 0.82rem; color: #8d99ae; }
+
+  /* ── Status dot ── */
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .dot-on  { background: #2ecc71; box-shadow: 0 0 6px #2ecc71aa; }
+  .dot-off { background: #e74c3c; }
+
+  /* ── Grid ── */
+  .zones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* ── Zone card ── */
+  .zone-card {
+    background: #1e2130;
+    border: 1px solid #2d3348;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .zone-card.drag-over { border-color: #4e9af1; box-shadow: 0 0 0 2px #4e9af144; }
+
+  .zone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 0.5rem;
+  }
+  .zone-header:hover { background: #262b3d; }
+
+  .zone-icon { font-size: 1.1rem; width: 28px; text-align: center; }
+  .zone-name { font-weight: 600; font-size: 0.95rem; flex: 1; }
+
+  .occ-badge {
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .occ-good    { background: #1a3a2a; color: #2ecc71; }
+  .occ-warn    { background: #3a2d10; color: #f39c12; }
+  .occ-full    { background: #3a1212; color: #e74c3c; }
+
+  .chevron { font-size: 0.75rem; color: #666; transition: transform 0.2s; }
+  .zone-card.open .chevron { transform: rotate(180deg); }
+
+  /* ── Progress bar ── */
+  .occ-bar-wrap { height: 4px; background: #2d3348; }
+  .occ-bar { height: 100%; border-radius: 0; transition: width 0.4s; }
+  .occ-bar.c-good { background: #2ecc71; }
+  .occ-bar.c-warn { background: #f39c12; }
+  .occ-bar.c-full { background: #e74c3c; }
+
+  /* ── Plates list (collapsed = hidden) ── */
+  .zone-plates {
+    display: none;
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid #2d3348;
+    min-height: 48px;
+  }
+  .zone-card.open .zone-plates { display: block; }
+
+  .plates-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-height: 32px;
+  }
+
+  /* ── Plate chip ── */
+  .plate-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #262b3d;
+    border: 1px solid #3a4060;
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: grab;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .plate-chip:hover { background: #2e3450; border-color: #4e9af1; }
+  .plate-chip.dragging { opacity: 0.4; transform: scale(0.96); cursor: grabbing; }
+
+  .plate-empty { font-size: 0.8rem; color: #555; font-style: italic; }
+
+  /* ── Drop hint ── */
+  .drop-hint {
+    display: none;
+    border: 2px dashed #4e9af155;
+    border-radius: 8px;
+    padding: 6px;
+    font-size: 0.75rem;
+    color: #4e9af1;
+    text-align: center;
+  }
+  .zone-card.drag-over .drop-hint { display: block; }
+  .zone-card.drag-over .plates-grid { border-color: #4e9af1; }
+
+  /* ── Arriving Soon panel ── */
+  .arriving-panel {
+    background: #141824;
+    border: 1px solid #3a4060;
+    border-left: 3px solid #9b59b6;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .arriving-panel h5 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #c39bd3;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .arriving-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .arriving-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    background: #1e1830;
+    border: 1px solid #5b2d82;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    gap: 2px;
+  }
+  .arriving-chip .ac-plate {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #e8d4f5;
+  }
+  .arriving-chip .ac-eta { color: #9b59b6; font-size: 0.72rem; }
+  .arriving-empty { font-size: 0.8rem; color: #555; font-style: italic; }
+
+  /* ── Summary row ── */
+  .summary-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .summary-stat {
+    flex: 1;
+    min-width: 120px;
+    background: #1e2130;
+    border: 1px solid #2d3348;
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+  }
+  .summary-stat .val { font-size: 1.5rem; font-weight: 700; }
+  .summary-stat .lbl { font-size: 0.75rem; color: #8d99ae; }
+
+  /* ── Controls ── */
+  .lf-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: #8d99ae;
+  }
+
+  /* ── Unsaved notice ── */
+  .unsaved-notice {
+    display: none;
+    background: #2d2a10;
+    border: 1px solid #f39c12;
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    color: #f39c12;
+    margin-bottom: 1rem;
+  }
+  .unsaved-notice.visible { display: block; }
+
+  /* ── Drag ghost ── */
+  #drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Header -->
-    <div class="live-header text-center">
-        <h1><i class="fas fa-broadcast-tower"></i> Live Parking Feed</h1>
-        <p class="mb-0">Real-time parking occupancy at Keflavík Airport Premium Valet</p>
-        <div class="mt-2">
-            <span class="status-indicator status-online" id="connectionStatus"></span>
-            <span id="connectionText">Connected</span> • 
-            <span class="last-updated" id="lastUpdated">Loading...</span>
+
+  <!-- Header -->
+  <div class="lf-header">
+    <div>
+      <h1><i class="fas fa-broadcast-tower"></i> Live Parking Feed</h1>
+      <div class="lf-meta">
+        <span class="dot dot-on" id="connDot"></span>
+        <span id="connText">Connected</span> &nbsp;·&nbsp;
+        <span id="lastUpdated">Loading…</span>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" id="toggleAllBtn" title="Expand/collapse all zones">
+        <i class="fas fa-expand-alt"></i> Expand All
+      </button>
+      <button class="btn btn-sm btn-outline-primary" id="refreshBtn">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" id="autoBtn">
+        <i class="fas fa-play"></i> Auto (30s)
+      </button>
+    </div>
+  </div>
+
+  <!-- Unsaved notice -->
+  <div class="unsaved-notice" id="unsavedNotice">
+    <i class="fas fa-exclamation-triangle"></i>
+    Zone layout has been manually edited. Positions are saved locally in your browser.
+    <a href="#" id="resetZoneBtn" style="color:#f39c12;margin-left:8px;">Reset to API defaults</a>
+  </div>
+
+  <!-- Arriving Soon -->
+  <div class="arriving-panel" id="arrivingPanel">
+    <h5><i class="fas fa-plane-arrival"></i> Arriving Soon <span style="font-weight:400;color:#777;font-size:0.78rem;margin-left:4px">(next 2 hours)</span></h5>
+    <div class="arriving-grid" id="arrivingGrid">
+      <span class="arriving-empty">Loading…</span>
+    </div>
+  </div>
+
+  <!-- Zone cards -->
+  <div class="zones-grid" id="zonesGrid">
+
+    <!-- Reception -->
+    <div class="zone-card" id="zone-reception" data-zone="reception" data-cap="14">
+      <div class="zone-header" onclick="toggleZone('reception')">
+        <span class="zone-icon">🚗</span>
+        <span class="zone-name">Reception</span>
+        <span class="occ-badge occ-good" id="badge-reception">0/14</span>
+        <span class="chevron"><i class="fas fa-chevron-down"></i></span>
+      </div>
+      <div class="occ-bar-wrap"><div class="occ-bar c-good" id="bar-reception" style="width:0%"></div></div>
+      <div class="zone-plates" id="plates-reception">
+        <div class="plates-grid" id="grid-reception" data-zone="reception">
+          <span class="plate-empty">Drop-off area — no cars</span>
         </div>
+        <div class="drop-hint">Drop plate here → Reception</div>
+      </div>
     </div>
 
-    <!-- Zone Flow Diagram -->
-    <div class="zone-flow">
-        <div class="text-center">
-            <i class="fas fa-door-open fa-2x text-primary"></i>
-            <div><strong>Reception</strong></div>
-            <div class="small text-muted">Drop-off</div>
+    <!-- Gull -->
+    <div class="zone-card" id="zone-gull" data-zone="gull" data-cap="50">
+      <div class="zone-header" onclick="toggleZone('gull')">
+        <span class="zone-icon">🏗️</span>
+        <span class="zone-name">Gull Storage</span>
+        <span class="occ-badge occ-good" id="badge-gull">0/50</span>
+        <span class="chevron"><i class="fas fa-chevron-down"></i></span>
+      </div>
+      <div class="occ-bar-wrap"><div class="occ-bar c-good" id="bar-gull" style="width:0%"></div></div>
+      <div class="zone-plates" id="plates-gull">
+        <div class="plates-grid" id="grid-gull" data-zone="gull">
+          <span class="plate-empty">Short-term storage — empty</span>
         </div>
-        <div class="zone-flow-arrow">
-            <i class="fas fa-arrow-right"></i>
-        </div>
-        <div class="text-center">
-            <i class="fas fa-warehouse fa-2x text-info"></i>
-            <div><strong>Storage</strong></div>
-            <div class="small text-muted">Gull + P3</div>
-        </div>
-        <div class="zone-flow-arrow">
-            <i class="fas fa-arrow-right"></i>
-        </div>
-        <div class="text-center">
-            <i class="fas fa-car-side fa-2x text-success"></i>
-            <div><strong>Delivery</strong></div>
-            <div class="small text-muted">Pick-up</div>
-        </div>
+        <div class="drop-hint">Drop plate here → Gull</div>
+      </div>
     </div>
 
-    <!-- Zone Cards -->
-    <div class="row g-4">
-        <!-- Reception Zone -->
-        <div class="col-lg-6 col-xl-3">
-            <div class="card zone-card h-100" id="reception-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-door-open text-primary"></i> Reception
-                        </h5>
-                        <div class="badge bg-primary" id="reception-count">0/14</div>
-                    </div>
-                    
-                    <div class="occupancy-bar mb-3">
-                        <div class="occupancy-fill bg-primary" id="reception-fill" style="width: 0%"></div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between text-muted small mb-2">
-                        <span>Available: <strong id="reception-available">14</strong></span>
-                        <span>Occupied: <strong id="reception-occupied">0</strong></span>
-                    </div>
-                    
-                    <div class="text-muted small">
-                        <i class="fas fa-info-circle"></i> Vehicle drop-off area
-                    </div>
-                    
-                    <div class="mt-3" id="reception-bookings">
-                        <!-- Active bookings will be populated here -->
-                    </div>
-                </div>
-            </div>
+    <!-- P3 -->
+    <div class="zone-card" id="zone-p3" data-zone="p3" data-cap="150">
+      <div class="zone-header" onclick="toggleZone('p3')">
+        <span class="zone-icon">🏢</span>
+        <span class="zone-name">P3 Storage</span>
+        <span class="occ-badge occ-good" id="badge-p3">0/150</span>
+        <span class="chevron"><i class="fas fa-chevron-down"></i></span>
+      </div>
+      <div class="occ-bar-wrap"><div class="occ-bar c-good" id="bar-p3" style="width:0%"></div></div>
+      <div class="zone-plates" id="plates-p3">
+        <div class="plates-grid" id="grid-p3" data-zone="p3">
+          <span class="plate-empty">Long-term storage — empty</span>
         </div>
-
-        <!-- Gull Storage -->
-        <div class="col-lg-6 col-xl-3">
-            <div class="card zone-card h-100" id="gull-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-warehouse text-info"></i> Gull Storage
-                        </h5>
-                        <div class="badge bg-info" id="gull-count">0/50</div>
-                    </div>
-                    
-                    <div class="occupancy-bar mb-3">
-                        <div class="occupancy-fill bg-info" id="gull-fill" style="width: 0%"></div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between text-muted small mb-2">
-                        <span>Available: <strong id="gull-available">50</strong></span>
-                        <span>Occupied: <strong id="gull-occupied">0</strong></span>
-                    </div>
-                    
-                    <div class="text-muted small">
-                        <i class="fas fa-info-circle"></i> Short-term storage
-                    </div>
-                    
-                    <div class="mt-3" id="gull-bookings">
-                        <!-- Active bookings will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- P3 Storage -->
-        <div class="col-lg-6 col-xl-3">
-            <div class="card zone-card h-100" id="p3-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-building text-warning"></i> P3 Storage
-                        </h5>
-                        <div class="badge bg-warning" id="p3-count">0/150</div>
-                    </div>
-                    
-                    <div class="occupancy-bar mb-3">
-                        <div class="occupancy-fill bg-warning" id="p3-fill" style="width: 0%"></div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between text-muted small mb-2">
-                        <span>Available: <strong id="p3-available">150</strong></span>
-                        <span>Occupied: <strong id="p3-occupied">0</strong></span>
-                    </div>
-                    
-                    <div class="text-muted small">
-                        <i class="fas fa-info-circle"></i> Long-term storage
-                    </div>
-                    
-                    <div class="mt-3" id="p3-bookings">
-                        <!-- Active bookings will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Delivery Zone -->
-        <div class="col-lg-6 col-xl-3">
-            <div class="card zone-card h-100" id="delivery-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-car-side text-success"></i> Delivery
-                        </h5>
-                        <div class="badge bg-success" id="delivery-count">0/20</div>
-                    </div>
-                    
-                    <div class="occupancy-bar mb-3">
-                        <div class="occupancy-fill bg-success" id="delivery-fill" style="width: 0%"></div>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between text-muted small mb-2">
-                        <span>Available: <strong id="delivery-available">20</strong></span>
-                        <span>Occupied: <strong id="delivery-occupied">0</strong></span>
-                    </div>
-                    
-                    <div class="text-muted small">
-                        <i class="fas fa-info-circle"></i> Vehicle pick-up area
-                    </div>
-                    
-                    <div class="mt-3" id="delivery-bookings">
-                        <!-- Active bookings will be populated here -->
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="drop-hint">Drop plate here → P3</div>
+      </div>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-chart-pie"></i> Overall Summary
-                    </h5>
-                    <div class="row text-center">
-                        <div class="col-6 col-md-3">
-                            <h3 class="text-primary mb-1" id="total-occupied">0</h3>
-                            <small class="text-muted">Total Occupied</small>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <h3 class="text-success mb-1" id="total-available">234</h3>
-                            <small class="text-muted">Total Available</small>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <h3 class="text-info mb-1" id="utilization-rate">0%</h3>
-                            <small class="text-muted">Utilization</small>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <h3 class="text-warning mb-1" id="active-bookings-count">0</h3>
-                            <small class="text-muted">Active Bookings</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Delivery -->
+    <div class="zone-card" id="zone-delivery" data-zone="delivery" data-cap="20">
+      <div class="zone-header" onclick="toggleZone('delivery')">
+        <span class="zone-icon">✅</span>
+        <span class="zone-name">Delivery</span>
+        <span class="occ-badge occ-good" id="badge-delivery">0/20</span>
+        <span class="chevron"><i class="fas fa-chevron-down"></i></span>
+      </div>
+      <div class="occ-bar-wrap"><div class="occ-bar c-good" id="bar-delivery" style="width:0%"></div></div>
+      <div class="zone-plates" id="plates-delivery">
+        <div class="plates-grid" id="grid-delivery" data-zone="delivery">
+          <span class="plate-empty">Pick-up area — no cars ready</span>
         </div>
+        <div class="drop-hint">Drop plate here → Delivery</div>
+      </div>
     </div>
 
-    <!-- Controls -->
-    <div class="row mt-3">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="refreshBtn">
-                        <i class="fas fa-sync-alt"></i> Refresh Now
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleAutoRefresh">
-                        <i class="fas fa-play"></i> Auto Refresh (30s)
-                    </button>
-                </div>
-                <small class="text-muted">
-                    Updates every 30 seconds • <span id="nextUpdate">Next: --:--</span>
-                </small>
-            </div>
-        </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-row">
+    <div class="summary-stat">
+      <div class="val text-primary" id="sumOccupied">0</div>
+      <div class="lbl">Total Occupied</div>
     </div>
+    <div class="summary-stat">
+      <div class="val text-success" id="sumAvailable">234</div>
+      <div class="lbl">Total Available</div>
+    </div>
+    <div class="summary-stat">
+      <div class="val text-info" id="sumUtil">0%</div>
+      <div class="lbl">Utilization</div>
+    </div>
+    <div class="summary-stat">
+      <div class="val text-warning" id="sumActive">0</div>
+      <div class="lbl">Active Bookings</div>
+    </div>
+  </div>
+
+  <!-- Controls footer -->
+  <div class="lf-controls">
+    <span id="dataSourceLabel"></span>
+    <span id="nextUpdate">Auto-refresh: off</span>
+  </div>
+
 </div>
+
+<!-- Drag ghost -->
+<div id="drag-ghost" class="plate-chip">?</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-class LiveFeed {
-    constructor() {
-        this.autoRefreshInterval = null;
-        this.autoRefreshEnabled = false;
-        this.nextUpdateCountdown = null;
-        this.init();
-    }
-    
-    init() {
-        // Initial load
-        this.fetchStatus();
-        
-        // Event listeners
-        document.getElementById('refreshBtn').addEventListener('click', () => this.fetchStatus());
-        document.getElementById('toggleAutoRefresh').addEventListener('click', () => this.toggleAutoRefresh());
-        
-        // Start auto refresh by default
-        this.toggleAutoRefresh();
-    }
-    
-    async fetchStatus() {
-        try {
-            const response = await fetch('/api/live-status');
-            const data = await response.json();
-            
-            if (data.success) {
-                this.updateUI(data);
-                this.setConnectionStatus(true);
-            } else {
-                console.error('API error:', data.error);
-                this.setConnectionStatus(false);
-            }
-        } catch (error) {
-            console.error('Network error:', error);
-            this.setConnectionStatus(false);
-        }
-    }
-    
-    updateUI(data) {
-        const { occupancy, capacities, active_bookings, timestamp } = data;
-        
-        // Update each zone
-        Object.keys(occupancy).forEach(zone => {
-            this.updateZone(zone, occupancy[zone], capacities[zone]);
-        });
-        
-        // Update active bookings
-        this.updateActiveBookings(active_bookings);
-        
-        // Update summary
-        this.updateSummary(occupancy, capacities, active_bookings);
-        
-        // Update last updated time
-        const lastUpdated = new Date(timestamp).toLocaleTimeString();
-        document.getElementById('lastUpdated').textContent = `Last updated: ${lastUpdated}`;
-    }
-    
-    updateZone(zone, occupied, capacity) {
-        const available = capacity - occupied;
-        const utilizationPercent = Math.round((occupied / capacity) * 100);
-        
-        // Update counts
-        document.getElementById(`${zone}-count`).textContent = `${occupied}/${capacity}`;
-        document.getElementById(`${zone}-available`).textContent = available;
-        document.getElementById(`${zone}-occupied`).textContent = occupied;
-        
-        // Update progress bar
-        document.getElementById(`${zone}-fill`).style.width = `${utilizationPercent}%`;
-        
-        // Update card styling based on occupancy
-        const card = document.getElementById(`${zone}-card`);
-        card.classList.remove('zone-full', 'zone-warning', 'zone-good');
-        
-        if (utilizationPercent >= 90) {
-            card.classList.add('zone-full');
-        } else if (utilizationPercent >= 75) {
-            card.classList.add('zone-warning');
-        } else {
-            card.classList.add('zone-good');
-        }
-    }
-    
-    updateActiveBookings(bookings) {
-        // Group bookings by zone
-        const byZone = {
-            reception: [],
-            gull: [],
-            p3: [],
-            delivery: []
-        };
-        
-        bookings.forEach(booking => {
-            if (byZone[booking.zone]) {
-                byZone[booking.zone].push(booking);
-            }
-        });
-        
-        // Update each zone's booking display
-        Object.keys(byZone).forEach(zone => {
-            const container = document.getElementById(`${zone}-bookings`);
-            const zoneBookings = byZone[zone];
-            
-            if (zoneBookings.length === 0) {
-                container.innerHTML = '<small class="text-muted">No active bookings</small>';
-            } else {
-                container.innerHTML = zoneBookings
-                    .slice(0, 3) // Show max 3
-                    .map(b => `<span class="active-booking">${b.plate || b.id.slice(-4)}</span>`)
-                    .join(' ');
-                
-                if (zoneBookings.length > 3) {
-                    container.innerHTML += `<span class="active-booking">+${zoneBookings.length - 3} more</span>`;
-                }
-            }
-        });
-    }
-    
-    updateSummary(occupancy, capacities, activeBookings) {
-        const totalOccupied = Object.values(occupancy).reduce((sum, val) => sum + val, 0);
-        const totalCapacity = Object.values(capacities).reduce((sum, val) => sum + val, 0);
-        const totalAvailable = totalCapacity - totalOccupied;
-        const utilizationRate = Math.round((totalOccupied / totalCapacity) * 100);
-        
-        document.getElementById('total-occupied').textContent = totalOccupied;
-        document.getElementById('total-available').textContent = totalAvailable;
-        document.getElementById('utilization-rate').textContent = `${utilizationRate}%`;
-        document.getElementById('active-bookings-count').textContent = activeBookings.length;
-    }
-    
-    setConnectionStatus(online) {
-        const indicator = document.getElementById('connectionStatus');
-        const text = document.getElementById('connectionText');
-        
-        if (online) {
-            indicator.className = 'status-indicator status-online';
-            text.textContent = 'Connected';
-        } else {
-            indicator.className = 'status-indicator status-offline';
-            text.textContent = 'Connection Error';
-        }
-    }
-    
-    toggleAutoRefresh() {
-        const button = document.getElementById('toggleAutoRefresh');
-        
-        if (this.autoRefreshEnabled) {
-            // Disable auto refresh
-            clearInterval(this.autoRefreshInterval);
-            clearInterval(this.nextUpdateCountdown);
-            this.autoRefreshEnabled = false;
-            button.innerHTML = '<i class="fas fa-play"></i> Auto Refresh (30s)';
-            document.getElementById('nextUpdate').textContent = 'Next: Paused';
-        } else {
-            // Enable auto refresh
-            this.autoRefreshEnabled = true;
-            button.innerHTML = '<i class="fas fa-pause"></i> Auto Refresh (30s)';
-            
-            this.autoRefreshInterval = setInterval(() => this.fetchStatus(), 30000);
-            this.startCountdown();
-        }
-    }
-    
-    startCountdown() {
-        let seconds = 30;
-        
-        this.nextUpdateCountdown = setInterval(() => {
-            seconds--;
-            if (seconds <= 0) {
-                seconds = 30;
-            }
-            
-            const minutes = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            const timeStr = `${minutes}:${secs.toString().padStart(2, '0')}`;
-            document.getElementById('nextUpdate').textContent = `Next: ${timeStr}`;
-        }, 1000);
-    }
+/* =========================================================
+   STATE
+   ========================================================= */
+const CAPS = { reception: 14, gull: 50, p3: 150, delivery: 20 };
+const ZONES = ['reception', 'gull', 'p3', 'delivery'];
+const LS_KEY = 'lf_zone_state_v1';
+
+// Manual zone overrides: { plate → zone }  (user drag-drop)
+let manualZoneMap = {};  // loaded from localStorage
+let hasManualEdits = false;
+
+// All known plates from last API call
+let apiBookings = [];
+
+/* =========================================================
+   LOCAL STORAGE  (persist manual moves across refreshes)
+   ========================================================= */
+function saveState() {
+  localStorage.setItem(LS_KEY, JSON.stringify(manualZoneMap));
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) manualZoneMap = JSON.parse(raw);
+  } catch(e) { manualZoneMap = {}; }
+}
+function clearState() {
+  manualZoneMap = {};
+  hasManualEdits = false;
+  localStorage.removeItem(LS_KEY);
+  document.getElementById('unsavedNotice').classList.remove('visible');
+  renderZones(apiBookings);
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    new LiveFeed();
+/* =========================================================
+   ZONE TOGGLE
+   ========================================================= */
+function toggleZone(zone) {
+  const card = document.getElementById('zone-' + zone);
+  card.classList.toggle('open');
+  const btn = document.getElementById('toggleAllBtn');
+  const anyOpen = ZONES.some(z => document.getElementById('zone-' + z).classList.contains('open'));
+  btn.innerHTML = anyOpen
+    ? '<i class="fas fa-compress-alt"></i> Collapse All'
+    : '<i class="fas fa-expand-alt"></i> Expand All';
+}
+
+document.getElementById('toggleAllBtn').addEventListener('click', () => {
+  const anyOpen = ZONES.some(z => document.getElementById('zone-' + z).classList.contains('open'));
+  ZONES.forEach(z => {
+    const card = document.getElementById('zone-' + z);
+    if (anyOpen) card.classList.remove('open');
+    else card.classList.add('open');
+  });
+  const btn = document.getElementById('toggleAllBtn');
+  btn.innerHTML = anyOpen
+    ? '<i class="fas fa-expand-alt"></i> Expand All'
+    : '<i class="fas fa-compress-alt"></i> Collapse All';
 });
+
+/* =========================================================
+   RENDER ZONES
+   ========================================================= */
+function effectiveZone(booking) {
+  return manualZoneMap[booking.plate] || booking.zone;
+}
+
+function renderZones(bookings) {
+  // Group plates by effective zone
+  const byZone = { reception: [], gull: [], p3: [], delivery: [] };
+  bookings.forEach(b => {
+    const z = effectiveZone(b);
+    if (byZone[z]) byZone[z].push(b);
+  });
+
+  ZONES.forEach(zone => {
+    const plates = byZone[zone];
+    const cap = CAPS[zone];
+    const occ = plates.length;
+    const pct = Math.round(occ / cap * 100);
+
+    // Badge
+    const badge = document.getElementById('badge-' + zone);
+    badge.textContent = `${occ}/${cap}`;
+    badge.className = 'occ-badge ' + (pct >= 90 ? 'occ-full' : pct >= 70 ? 'occ-warn' : 'occ-good');
+
+    // Bar
+    const bar = document.getElementById('bar-' + zone);
+    bar.style.width = pct + '%';
+    bar.className = 'occ-bar ' + (pct >= 90 ? 'c-full' : pct >= 70 ? 'c-warn' : 'c-good');
+
+    // Card border tint
+    const card = document.getElementById('zone-' + zone);
+    card.style.borderColor = pct >= 90 ? '#e74c3c44' : pct >= 70 ? '#f39c1244' : '#2d3348';
+
+    // Plates grid
+    const grid = document.getElementById('grid-' + zone);
+    if (plates.length === 0) {
+      grid.innerHTML = `<span class="plate-empty">${emptyLabel(zone)}</span>`;
+    } else {
+      grid.innerHTML = plates.map(b => plateChip(b.plate)).join('');
+      // Re-attach drag listeners
+      grid.querySelectorAll('.plate-chip').forEach(chip => attachDrag(chip));
+    }
+
+    // Update drop zones
+    const gridEl = document.getElementById('grid-' + zone);
+    gridEl.setAttribute('data-zone', zone);
+  });
+
+  // Summary
+  const totalOcc = ZONES.reduce((s, z) => s + byZone[z].length, 0);
+  const totalCap = ZONES.reduce((s, z) => s + CAPS[z], 0);
+  document.getElementById('sumOccupied').textContent = totalOcc;
+  document.getElementById('sumAvailable').textContent = totalCap - totalOcc;
+  document.getElementById('sumUtil').textContent = Math.round(totalOcc / totalCap * 100) + '%';
+  document.getElementById('sumActive').textContent = bookings.length;
+}
+
+function plateChip(plate) {
+  return `<div class="plate-chip" draggable="true" data-plate="${plate}" title="Drag to move zone">${plate}</div>`;
+}
+
+function emptyLabel(zone) {
+  const labels = {
+    reception: 'Drop-off area — no cars',
+    gull: 'Short-term storage — empty',
+    p3: 'Long-term storage — empty',
+    delivery: 'Pick-up area — no cars ready'
+  };
+  return labels[zone] || 'Empty';
+}
+
+/* =========================================================
+   ARRIVING SOON
+   ========================================================= */
+function renderArrivingSoon(arriving) {
+  const grid = document.getElementById('arrivingGrid');
+  if (!arriving || arriving.length === 0) {
+    grid.innerHTML = '<span class="arriving-empty">No arrivals expected in the next 2 hours</span>';
+    return;
+  }
+  grid.innerHTML = arriving.map(a => {
+    const etaStr = a.arrives_in_min < 60
+      ? `${a.arrives_in_min} min`
+      : `${Math.round(a.arrives_in_min / 60 * 10) / 10} hr`;
+    return `<div class="arriving-chip">
+      <span class="ac-plate">${a.plate}</span>
+      <span class="ac-eta">in ${etaStr}</span>
+    </div>`;
+  }).join('');
+}
+
+/* =========================================================
+   DRAG AND DROP
+   ========================================================= */
+let dragPlate = null;
+const ghost = document.getElementById('drag-ghost');
+
+function attachDrag(chip) {
+  chip.addEventListener('dragstart', e => {
+    dragPlate = chip.dataset.plate;
+    chip.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragPlate);
+    // Custom ghost
+    ghost.textContent = dragPlate;
+    ghost.style.display = 'block';
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    setTimeout(() => ghost.style.display = 'none', 0);
+  });
+  chip.addEventListener('dragend', () => {
+    chip.classList.remove('dragging');
+    dragPlate = null;
+  });
+}
+
+// Attach drop to all zone grids
+ZONES.forEach(zone => {
+  const card = document.getElementById('zone-' + zone);
+
+  card.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    card.classList.add('drag-over');
+    // Auto-open zone on hover
+    if (!card.classList.contains('open')) card.classList.add('open');
+  });
+
+  card.addEventListener('dragleave', e => {
+    // Only remove if leaving the card entirely
+    if (!card.contains(e.relatedTarget)) {
+      card.classList.remove('drag-over');
+    }
+  });
+
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const plate = e.dataTransfer.getData('text/plain') || dragPlate;
+    if (!plate) return;
+    // Find the booking with this plate
+    const booking = apiBookings.find(b => b.plate === plate);
+    if (!booking) return;
+    const prevZone = effectiveZone(booking);
+    if (prevZone === zone) return; // no-op
+    manualZoneMap[plate] = zone;
+    hasManualEdits = true;
+    saveState();
+    document.getElementById('unsavedNotice').classList.add('visible');
+    renderZones(apiBookings);
+    // Flash the card
+    card.style.transition = 'background 0.3s';
+    card.style.background = '#1e2a1e';
+    setTimeout(() => card.style.background = '', 400);
+  });
+});
+
+/* =========================================================
+   API
+   ========================================================= */
+async function fetchStatus() {
+  try {
+    const res = await fetch('/api/live-status');
+    const data = await res.json();
+    if (data.success) {
+      apiBookings = data.active_bookings || [];
+      renderZones(apiBookings);
+      renderArrivingSoon(data.arriving_soon || []);
+
+      // Connection
+      document.getElementById('connDot').className = 'dot dot-on';
+      document.getElementById('connText').textContent = 'Connected';
+
+      // Last updated
+      const t = new Date(data.timestamp);
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Data source
+      document.getElementById('dataSourceLabel').textContent =
+        'Source: ' + (data.data_source === 'premium_parking_api' ? 'Live Parking API' : 'Simulated data');
+    } else {
+      setOffline();
+    }
+  } catch(e) {
+    setOffline();
+  }
+}
+
+function setOffline() {
+  document.getElementById('connDot').className = 'dot dot-off';
+  document.getElementById('connText').textContent = 'Connection error';
+}
+
+/* =========================================================
+   AUTO-REFRESH
+   ========================================================= */
+let autoTimer = null;
+let countdownTimer = null;
+let autoEnabled = false;
+let secondsLeft = 30;
+
+function startCountdown() {
+  secondsLeft = 30;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    secondsLeft--;
+    if (secondsLeft <= 0) secondsLeft = 30;
+    document.getElementById('nextUpdate').textContent =
+      `Next refresh in ${secondsLeft}s`;
+  }, 1000);
+}
+
+document.getElementById('autoBtn').addEventListener('click', () => {
+  autoEnabled = !autoEnabled;
+  const btn = document.getElementById('autoBtn');
+  if (autoEnabled) {
+    btn.innerHTML = '<i class="fas fa-pause"></i> Auto (30s)';
+    autoTimer = setInterval(fetchStatus, 30000);
+    startCountdown();
+  } else {
+    btn.innerHTML = '<i class="fas fa-play"></i> Auto (30s)';
+    clearInterval(autoTimer);
+    clearInterval(countdownTimer);
+    document.getElementById('nextUpdate').textContent = 'Auto-refresh: off';
+  }
+});
+
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  fetchStatus();
+  if (autoEnabled) startCountdown();
+});
+
+document.getElementById('resetZoneBtn').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('Reset all manual zone overrides and revert to API defaults?')) clearState();
+});
+
+/* =========================================================
+   INIT
+   ========================================================= */
+loadState();
+if (Object.keys(manualZoneMap).length > 0) {
+  hasManualEdits = true;
+  document.getElementById('unsavedNotice').classList.add('visible');
+}
+fetchStatus();
 </script>
 {% endblock %}
