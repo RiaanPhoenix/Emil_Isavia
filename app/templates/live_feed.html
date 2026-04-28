@@ -27,7 +27,7 @@
     gap: 0.6rem;
   }
 
-  /* ── Status pill ── */
+  /* ── Connection pill ── */
   .conn-pill {
     display: inline-flex;
     align-items: center;
@@ -47,65 +47,121 @@
   }
   .conn-dot.off { background: var(--red); box-shadow: none; }
 
-  /* ── Arriving soon ── */
-  .arriving-card {
+  /* ── Manual edit notice ── */
+  .unsaved-notice {
+    display: none;
+    border-left: 3px solid var(--amber);
+    background: var(--amber-soft);
+    color: #78350f;
+    border-radius: var(--radius);
+    padding: 0.55rem 1rem;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
+  .unsaved-notice.visible { display: block; }
+  .unsaved-notice a { color: #92400e; font-weight: 600; }
+
+  /* ══════════════════════════════════
+     UPCOMING ARRIVALS PANEL
+     ══════════════════════════════════ */
+  .upcoming-panel {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid #e9d5ff;
     border-left: 3px solid #7c3aed;
     border-radius: var(--radius-lg);
     padding: 1rem 1.25rem;
     margin-bottom: 1.5rem;
     box-shadow: var(--shadow-sm);
   }
-  .arriving-card-title {
-    font-size: 0.8rem;
+  .upcoming-panel.drag-over {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124,58,237,0.12), var(--shadow);
+  }
+  .upcoming-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.2rem;
+  }
+  .upcoming-header h2 {
+    font-size: 0.82rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: #7c3aed;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
+    margin: 0;
   }
-  .arriving-chips {
+  .upcoming-desc {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin-bottom: 0.85rem;
+    line-height: 1.4;
+  }
+  .upcoming-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    min-height: 36px;
   }
-  .arriving-chip {
+
+  /* Upcoming chip — draggable card */
+  .upcoming-chip {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     background: #faf5ff;
-    border: 1px solid #e9d5ff;
+    border: 1px solid #ddd6fe;
     border-radius: var(--radius);
-    padding: 0.4rem 0.9rem;
-    gap: 1px;
+    padding: 0.45rem 1rem;
+    gap: 2px;
+    cursor: grab;
+    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, opacity 0.12s;
+    user-select: none;
   }
-  .arriving-chip .ac-plate {
+  .upcoming-chip:hover {
+    background: #ede9fe;
+    border-color: #7c3aed;
+    box-shadow: var(--shadow-sm);
+  }
+  .upcoming-chip.dragging { opacity: 0.35; cursor: grabbing; }
+  .upcoming-chip.manually-added {
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+  .uc-plate {
     font-family: 'Courier New', monospace;
     font-weight: 700;
     font-size: 0.84rem;
     color: #4c1d95;
     letter-spacing: 0.04em;
   }
-  .arriving-chip .ac-eta {
-    font-size: 0.7rem;
-    color: #7c3aed;
-    font-weight: 500;
-  }
-  .arriving-empty { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+  .uc-eta { font-size: 0.7rem; color: #7c3aed; font-weight: 500; }
+  .uc-arrived { font-size: 0.7rem; color: var(--green); font-weight: 600; }
 
-  /* ── Zones grid ── */
+  .upcoming-empty { font-size: 0.8rem; color: var(--text-muted); font-style: italic; }
+  .upcoming-drop-hint {
+    display: none;
+    margin-top: 0.6rem;
+    padding: 0.4rem 0.75rem;
+    border: 1.5px dashed rgba(124,58,237,0.35);
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    color: #7c3aed;
+    text-align: center;
+    background: #faf5ff;
+  }
+  .upcoming-panel.drag-over .upcoming-drop-hint { display: block; }
+
+  /* ══════════════════════════════════
+     ACTIVE PARKING ZONES
+     ══════════════════════════════════ */
   .zones-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 
-  /* ── Zone card ── */
   .zone-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -119,14 +175,11 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(37,99,235,0.12), var(--shadow);
   }
-
-  /* accent stripe per zone */
   .zone-card[data-zone="reception"] { border-top: 3px solid var(--accent); }
   .zone-card[data-zone="gull"]      { border-top: 3px solid var(--amber); }
   .zone-card[data-zone="p3"]        { border-top: 3px solid var(--slate); }
   .zone-card[data-zone="delivery"]  { border-top: 3px solid var(--green); }
 
-  /* ── Zone header (clickable) ── */
   .zone-header {
     display: flex;
     align-items: center;
@@ -134,87 +187,48 @@
     padding: 0.85rem 1rem;
     cursor: pointer;
     user-select: none;
-    background: var(--surface);
   }
   .zone-header:hover { background: var(--surface-alt); }
+  .zh-icon { font-size: 1rem; width: 26px; text-align: center; flex-shrink: 0; }
+  .zh-name { font-size: 0.88rem; font-weight: 600; color: var(--text); flex: 1; }
+  .zh-sub  { font-size: 0.72rem; color: var(--text-muted); font-weight: 400; }
 
-  .zone-header .zh-icon {
-    font-size: 1rem;
-    width: 26px;
-    text-align: center;
-    flex-shrink: 0;
-  }
-  .zone-header .zh-name {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--text);
-    flex: 1;
-  }
-  .zone-header .zh-sub {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    font-weight: 400;
-  }
-
-  /* occupancy badge */
   .occ-pill {
-    font-size: 0.78rem;
-    font-weight: 700;
+    font-size: 0.78rem; font-weight: 700;
     padding: 0.2rem 0.65rem;
-    border-radius: 999px;
-    white-space: nowrap;
-    flex-shrink: 0;
+    border-radius: 999px; white-space: nowrap; flex-shrink: 0;
   }
-  .occ-good { background: var(--green-soft);  color: var(--green); }
-  .occ-warn { background: var(--amber-soft);  color: var(--amber); }
-  .occ-full { background: var(--red-soft);    color: var(--red); }
+  .occ-good { background: var(--green-soft); color: var(--green); }
+  .occ-warn { background: var(--amber-soft); color: var(--amber); }
+  .occ-full { background: var(--red-soft);   color: var(--red); }
 
-  .zh-chevron {
-    font-size: 0.7rem;
-    color: var(--text-light);
-    flex-shrink: 0;
-    transition: transform 0.2s;
-  }
+  .zh-chevron { font-size: 0.7rem; color: var(--text-light); flex-shrink: 0; transition: transform 0.2s; }
   .zone-card.open .zh-chevron { transform: rotate(180deg); }
 
-  /* ── Progress bar ── */
-  .zone-prog-wrap {
-    height: 3px;
-    background: var(--border);
-  }
-  .zone-prog {
-    height: 100%;
-    transition: width 0.45s ease;
-  }
+  .zone-prog-wrap { height: 3px; background: var(--border); }
+  .zone-prog { height: 100%; transition: width 0.45s ease; }
   .zone-prog.pg-good { background: var(--green); }
   .zone-prog.pg-warn { background: var(--amber); }
   .zone-prog.pg-full { background: var(--red); }
 
-  /* ── Expanded plate list ── */
   .zone-body {
     display: none;
     padding: 0.85rem 1rem 1rem;
     border-top: 1px solid var(--border);
-    background: var(--surface);
   }
   .zone-card.open .zone-body { display: block; }
 
-  .plate-wrap {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    min-height: 36px;
-  }
+  .plate-wrap { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 36px; }
 
-  /* ── Plate chip ── */
+  /* Active plate chip — has a ✓ mark button */
   .plate-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     background: var(--surface-alt);
     border: 1px solid var(--border);
     border-radius: 5px;
-    padding: 3px 9px;
+    padding: 3px 4px 3px 9px;
     font-size: 0.78rem;
     font-family: 'Courier New', monospace;
     font-weight: 700;
@@ -231,9 +245,32 @@
   }
   .plate-chip.dragging { opacity: 0.35; cursor: grabbing; }
 
+  /* Return checkmark button */
+  .return-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px; height: 18px;
+    border-radius: 3px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-light);
+    font-size: 0.65rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    line-height: 1;
+    padding: 0;
+  }
+  .return-btn:hover {
+    background: var(--green-soft);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .return-btn title { display: none; }
+
   .plate-empty { font-size: 0.78rem; color: var(--text-light); font-style: italic; }
 
-  /* ── Drop hint strip ── */
   .drop-hint-strip {
     display: none;
     margin-top: 0.6rem;
@@ -247,7 +284,136 @@
   }
   .zone-card.drag-over .drop-hint-strip { display: block; }
 
-  /* ── Summary strip ── */
+  /* ══════════════════════════════════
+     RETURNED TO CUSTOMER ZONE
+     ══════════════════════════════════ */
+  .returned-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--green);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .returned-panel.drag-over {
+    border-color: var(--green);
+    box-shadow: 0 0 0 2px rgba(22,163,74,0.15), var(--shadow);
+  }
+  .returned-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .returned-header:hover { background: var(--surface-alt); }
+  .returned-header .rh-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+  .returned-header .rh-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  .returned-count-pill {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    background: var(--green-soft);
+    color: var(--green);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .returned-chevron { font-size: 0.7rem; color: var(--text-light); flex-shrink: 0; transition: transform 0.2s; }
+  .returned-panel.open .returned-chevron { transform: rotate(180deg); }
+
+  .returned-body {
+    display: none;
+    padding: 0.85rem 1.25rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .returned-panel.open .returned-body { display: block; }
+
+  .returned-desc {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .returned-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 32px; }
+
+  .returned-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--green-soft);
+    border: 1px solid #bbf7d0;
+    border-radius: 5px;
+    padding: 3px 4px 3px 9px;
+    font-size: 0.78rem;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #15803d;
+  }
+  .undo-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    background: transparent;
+    border: 1px solid #86efac;
+    color: #16a34a;
+    font-size: 0.6rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, border-color 0.12s;
+    padding: 0;
+  }
+  .undo-btn:hover { background: #dcfce7; border-color: var(--green); }
+
+  .returned-drop-hint {
+    display: none;
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    border: 1.5px dashed rgba(22,163,74,0.4);
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    color: var(--green);
+    text-align: center;
+    background: var(--green-soft);
+  }
+  .returned-panel.drag-over .returned-drop-hint { display: block; }
+
+  .returned-empty { font-size: 0.78rem; color: var(--text-light); font-style: italic; }
+
+  /* clear returned history button */
+  .clear-returned-btn {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: var(--radius);
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    margin-left: auto;
+    display: inline-block;
+  }
+  .clear-returned-btn:hover { color: var(--red); border-color: var(--red); }
+
+  /* ══════════════════════════════════
+     SUMMARY + FOOTER
+     ══════════════════════════════════ */
   .summary-strip {
     display: flex;
     gap: 0.75rem;
@@ -255,8 +421,7 @@
     margin-bottom: 1.25rem;
   }
   .summary-stat {
-    flex: 1;
-    min-width: 110px;
+    flex: 1; min-width: 110px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -265,51 +430,28 @@
     box-shadow: var(--shadow-sm);
   }
   .summary-stat .ss-val {
-    font-size: 1.5rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 0.25rem;
+    font-size: 1.5rem; font-weight: 700; line-height: 1; margin-bottom: 0.25rem;
   }
   .summary-stat .ss-lbl {
-    font-size: 0.72rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
+    font-size: 0.72rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
   }
 
-  /* ── Unsaved notice ── */
-  .unsaved-notice {
-    display: none;
-    border-left: 3px solid var(--amber);
-    background: var(--amber-soft);
-    color: #78350f;
-    border-radius: var(--radius);
-    padding: 0.55rem 1rem;
-    font-size: 0.8rem;
-    margin-bottom: 1rem;
-  }
-  .unsaved-notice.visible { display: block; }
-  .unsaved-notice a { color: #92400e; font-weight: 600; }
-
-  /* ── Footer controls ── */
   .lf-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    padding-top: 0.25rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 0.5rem;
+    font-size: 0.78rem; color: var(--text-muted); padding-top: 0.25rem;
   }
 
-  /* ── Drag ghost ── */
+  /* drag ghost */
   #drag-ghost {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9999;
-    display: none;
+    position: fixed; pointer-events: none; z-index: 9999;
+    top: -200px; left: -200px; display: block;
+    /* styled same as plate-chip but never visible on screen */
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 9px;
+    font-size: 0.78rem; font-family: 'Courier New', monospace; font-weight: 700;
   }
 </style>
 {% endblock %}
@@ -317,10 +459,13 @@
 {% block content %}
 <div class="container-fluid">
 
-  <!-- Page header -->
+  <!-- ── Page header ── -->
   <div class="lf-page-header">
     <div>
-      <h1><i class="fas fa-broadcast-tower" style="color:var(--accent);margin-right:0.4rem;font-size:1.1rem;"></i>Live Parking Feed</h1>
+      <h1>
+        <i class="fas fa-broadcast-tower" style="color:var(--accent);margin-right:0.4rem;font-size:1.1rem;"></i>
+        Live Parking Feed
+      </h1>
       <div class="sub">
         <span class="conn-pill">
           <span class="conn-dot" id="connDot"></span>
@@ -342,25 +487,33 @@
     </div>
   </div>
 
-  <!-- Manual edit notice -->
+  <!-- ── Manual override notice ── -->
   <div class="unsaved-notice" id="unsavedNotice">
     <i class="fas fa-info-circle"></i>
     Zone layout includes manual overrides — positions are stored in your browser.
     <a href="#" id="resetZoneBtn">Reset to API defaults</a>
   </div>
 
-  <!-- Arriving Soon -->
-  <div class="arriving-card">
-    <div class="arriving-card-title">
-      <i class="fas fa-plane-arrival"></i> Arriving Soon
-      <span style="font-weight:400;color:var(--text-light);text-transform:none;letter-spacing:0;font-size:0.75rem;">next 2 hours</span>
+  <!-- ══════════════════════════════════
+       UPCOMING PREMIUM PARKING ARRIVALS
+       ══════════════════════════════════ -->
+  <div class="upcoming-panel" id="upcomingPanel">
+    <div class="upcoming-header">
+      <h2><i class="fas fa-plane-arrival" style="margin-right:0.3rem;"></i>Upcoming Premium Parking Arrivals</h2>
     </div>
-    <div class="arriving-chips" id="arrivingGrid">
-      <span class="arriving-empty">Loading…</span>
+    <p class="upcoming-desc">
+      These customers are expected to drop off their car at the premium parking service within the next 2 hours.
+      Once a car has arrived, drag its plate into the correct parking zone below.
+    </p>
+    <div class="upcoming-chips" id="upcomingChips">
+      <span class="upcoming-empty">Loading…</span>
     </div>
+    <div class="upcoming-drop-hint">Drop here to return a plate to Upcoming Arrivals</div>
   </div>
 
-  <!-- Zone cards -->
+  <!-- ══════════════════════════════════
+       ACTIVE PARKING ZONES
+       ══════════════════════════════════ -->
   <div class="zones-grid" id="zonesGrid">
 
     <div class="zone-card" id="zone-reception" data-zone="reception" data-cap="14">
@@ -371,11 +524,9 @@
         <span class="zh-chevron"><i class="fas fa-chevron-down"></i></span>
       </div>
       <div class="zone-prog-wrap"><div class="zone-prog pg-good" id="bar-reception" style="width:0%"></div></div>
-      <div class="zone-body" id="body-reception">
-        <div class="plate-wrap" id="grid-reception" data-zone="reception">
-          <span class="plate-empty">Drop-off area — no cars</span>
-        </div>
-        <div class="drop-hint-strip">Drop here to move to Reception</div>
+      <div class="zone-body">
+        <div class="plate-wrap" id="grid-reception"></div>
+        <div class="drop-hint-strip">Drop here → Reception</div>
       </div>
     </div>
 
@@ -387,11 +538,9 @@
         <span class="zh-chevron"><i class="fas fa-chevron-down"></i></span>
       </div>
       <div class="zone-prog-wrap"><div class="zone-prog pg-good" id="bar-gull" style="width:0%"></div></div>
-      <div class="zone-body" id="body-gull">
-        <div class="plate-wrap" id="grid-gull" data-zone="gull">
-          <span class="plate-empty">Short-term storage — empty</span>
-        </div>
-        <div class="drop-hint-strip">Drop here to move to Gull</div>
+      <div class="zone-body">
+        <div class="plate-wrap" id="grid-gull"></div>
+        <div class="drop-hint-strip">Drop here → Gull</div>
       </div>
     </div>
 
@@ -403,53 +552,71 @@
         <span class="zh-chevron"><i class="fas fa-chevron-down"></i></span>
       </div>
       <div class="zone-prog-wrap"><div class="zone-prog pg-good" id="bar-p3" style="width:0%"></div></div>
-      <div class="zone-body" id="body-p3">
-        <div class="plate-wrap" id="grid-p3" data-zone="p3">
-          <span class="plate-empty">Long-term storage — empty</span>
-        </div>
-        <div class="drop-hint-strip">Drop here to move to P3</div>
+      <div class="zone-body">
+        <div class="plate-wrap" id="grid-p3"></div>
+        <div class="drop-hint-strip">Drop here → P3</div>
       </div>
     </div>
 
     <div class="zone-card" id="zone-delivery" data-zone="delivery" data-cap="20">
       <div class="zone-header" onclick="toggleZone('delivery')">
-        <span class="zh-icon">✅</span>
-        <span class="zh-name">Delivery <span class="zh-sub">Pick-up ready</span></span>
+        <span class="zh-icon">📋</span>
+        <span class="zh-name">Delivery Staging <span class="zh-sub">Ready for pick-up</span></span>
         <span class="occ-pill occ-good" id="badge-delivery">0/20</span>
         <span class="zh-chevron"><i class="fas fa-chevron-down"></i></span>
       </div>
       <div class="zone-prog-wrap"><div class="zone-prog pg-good" id="bar-delivery" style="width:0%"></div></div>
-      <div class="zone-body" id="body-delivery">
-        <div class="plate-wrap" id="grid-delivery" data-zone="delivery">
-          <span class="plate-empty">Pick-up area — no cars ready</span>
-        </div>
-        <div class="drop-hint-strip">Drop here to move to Delivery</div>
+      <div class="zone-body">
+        <div class="plate-wrap" id="grid-delivery"></div>
+        <div class="drop-hint-strip">Drop here → Delivery Staging</div>
       </div>
     </div>
 
+  </div>
+
+  <!-- ══════════════════════════════════
+       RETURNED TO CUSTOMER
+       ══════════════════════════════════ -->
+  <div class="returned-panel" id="returnedPanel">
+    <div class="returned-header" onclick="toggleReturned()">
+      <span style="font-size:1rem;width:26px;text-align:center;flex-shrink:0;">✅</span>
+      <span class="rh-title">Returned to Customer <span class="rh-sub">— completed handovers</span></span>
+      <span class="returned-count-pill" id="returnedCountPill">0 returned</span>
+      <span class="returned-chevron"><i class="fas fa-chevron-down"></i></span>
+    </div>
+    <div class="returned-body" id="returnedBody">
+      <p class="returned-desc">
+        Cars listed here have been handed back to the customer and are no longer in the parking system.
+        Drag a plate here, or click the <strong>✓</strong> button on any active plate, to mark it as returned.
+        <button class="clear-returned-btn" id="clearReturnedBtn">Clear history</button>
+      </p>
+      <div class="returned-chips" id="returnedChips">
+        <span class="returned-empty">No cars returned yet today</span>
+      </div>
+      <div class="returned-drop-hint">Drop here to mark as returned to customer</div>
+    </div>
   </div>
 
   <!-- Summary -->
   <div class="summary-strip">
     <div class="summary-stat">
-      <div class="ss-val text-primary" id="sumOccupied">0</div>
+      <div class="ss-val text-primary"  id="sumOccupied">0</div>
       <div class="ss-lbl">Occupied</div>
     </div>
     <div class="summary-stat">
-      <div class="ss-val text-success" id="sumAvailable">234</div>
+      <div class="ss-val text-success"  id="sumAvailable">234</div>
       <div class="ss-lbl">Available</div>
     </div>
     <div class="summary-stat">
-      <div class="ss-val text-warning" id="sumUtil">0%</div>
+      <div class="ss-val text-warning"  id="sumUtil">0%</div>
       <div class="ss-lbl">Utilization</div>
     </div>
     <div class="summary-stat">
-      <div class="ss-val" style="color:var(--text);" id="sumActive">0</div>
-      <div class="ss-lbl">Active Bookings</div>
+      <div class="ss-val"               id="sumReturned" style="color:var(--green);">0</div>
+      <div class="ss-lbl">Returned Today</div>
     </div>
   </div>
 
-  <!-- Footer -->
   <div class="lf-footer">
     <span id="dataSourceLabel"></span>
     <span id="nextUpdate">Auto-refresh: off</span>
@@ -457,36 +624,62 @@
 
 </div>
 
-<!-- Drag ghost (offscreen placeholder for HTML5 drag image) -->
-<div id="drag-ghost" class="plate-chip" style="top:-200px;left:-200px;"></div>
+<!-- Offscreen drag ghost -->
+<div id="drag-ghost">?</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-/* ─── CONFIG ─── */
+/* ═══════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════ */
 const CAPS  = { reception: 14, gull: 50, p3: 150, delivery: 20 };
 const ZONES = ['reception', 'gull', 'p3', 'delivery'];
-const LS_KEY = 'lf_zone_v2';
+const LS_ZONES    = 'lf_zone_v3';       // plate → zone or 'upcoming'
+const LS_RETURNED = 'lf_returned_v3';   // Set of returned plates
 
-/* ─── STATE ─── */
-let manualMap = {};   // plate → zone (user overrides)
-let apiBookings = []; // last API response
-let hasEdits = false;
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════ */
+let zoneMap     = {};   // plate → zone | 'upcoming' (manual overrides)
+let returnedSet = new Set(); // plates that have been returned
 
-/* ─── LOCALSTORAGE ─── */
-function saveMap()  { localStorage.setItem(LS_KEY, JSON.stringify(manualMap)); }
-function loadMap()  { try { manualMap = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { manualMap = {}; } }
-function clearMap() {
-  manualMap = {}; hasEdits = false;
-  localStorage.removeItem(LS_KEY);
+// All plates seen (from API + manual), keyed by plate string
+let plateRegistry = {}; // plate → { plate, eta_min?, source: 'api'|'manual' }
+
+let apiBookings   = [];
+let apiArrivals   = [];
+let hasEdits      = false;
+
+/* ═══════════════════════════════════════════════════════════
+   PERSISTENCE
+   ═══════════════════════════════════════════════════════════ */
+function saveState() {
+  localStorage.setItem(LS_ZONES,    JSON.stringify(zoneMap));
+  localStorage.setItem(LS_RETURNED, JSON.stringify([...returnedSet]));
+}
+function loadState() {
+  try { zoneMap     = JSON.parse(localStorage.getItem(LS_ZONES)    || '{}'); } catch { zoneMap = {}; }
+  try { returnedSet = new Set(JSON.parse(localStorage.getItem(LS_RETURNED) || '[]')); } catch { returnedSet = new Set(); }
+}
+function clearZoneOverrides() {
+  // Remove zone overrides but keep returned set
+  zoneMap = {};
+  hasEdits = false;
+  saveState();
   document.getElementById('unsavedNotice').classList.remove('visible');
-  renderZones(apiBookings);
+  rebuildAll();
 }
 
-/* ─── ZONE TOGGLE ─── */
+/* ═══════════════════════════════════════════════════════════
+   ZONE TOGGLE
+   ═══════════════════════════════════════════════════════════ */
 function toggleZone(z) {
   document.getElementById('zone-' + z).classList.toggle('open');
   syncToggleBtn();
+}
+function toggleReturned() {
+  document.getElementById('returnedPanel').classList.toggle('open');
 }
 function syncToggleBtn() {
   const anyOpen = ZONES.some(z => document.getElementById('zone-' + z).classList.contains('open'));
@@ -500,152 +693,263 @@ document.getElementById('toggleAllBtn').addEventListener('click', () => {
   syncToggleBtn();
 });
 
-/* ─── RENDER ZONES ─── */
-function effectiveZone(b) { return manualMap[b.plate] || b.zone; }
+/* ═══════════════════════════════════════════════════════════
+   MARK AS RETURNED
+   ═══════════════════════════════════════════════════════════ */
+function markReturned(plate) {
+  returnedSet.add(plate);
+  // Remove from zoneMap if it was manually placed
+  delete zoneMap[plate];
+  hasEdits = true;
+  saveState();
+  rebuildAll();
+  // Auto-open returned panel
+  document.getElementById('returnedPanel').classList.add('open');
+}
 
-function renderZones(bookings) {
-  const byZone = { reception: [], gull: [], p3: [], delivery: [] };
-  bookings.forEach(b => { const z = effectiveZone(b); if (byZone[z]) byZone[z].push(b); });
+function undoReturned(plate) {
+  returnedSet.delete(plate);
+  saveState();
+  rebuildAll();
+}
 
+/* ═══════════════════════════════════════════════════════════
+   EFFECTIVE ZONE RESOLUTION
+   ═══════════════════════════════════════════════════════════ */
+// Returns: 'upcoming' | 'reception' | 'gull' | 'p3' | 'delivery' | null
+function effectiveZone(plate) {
+  if (returnedSet.has(plate)) return '__returned__';
+  if (zoneMap[plate]) return zoneMap[plate];
+  // Fall back to API
+  const ab = apiBookings.find(b => b.plate === plate);
+  if (ab) return ab.zone;
+  const ar = apiArrivals.find(a => a.plate === plate);
+  if (ar) return 'upcoming';
+  return 'upcoming'; // default for manually added
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REBUILD EVERYTHING
+   ═══════════════════════════════════════════════════════════ */
+function rebuildAll() {
+  // Collect all known plates (from API + zoneMap manual)
+  const allPlates = new Set([
+    ...apiBookings.map(b => b.plate),
+    ...apiArrivals.map(a => a.plate),
+    ...Object.keys(zoneMap),
+    ...returnedSet,
+  ]);
+
+  // Bucket them
+  const buckets = { upcoming: [], reception: [], gull: [], p3: [], delivery: [], returned: [] };
+  allPlates.forEach(plate => {
+    const z = effectiveZone(plate);
+    if (z === '__returned__') buckets.returned.push(plate);
+    else if (ZONES.includes(z)) buckets[z].push(plate);
+    else buckets.upcoming.push(plate);
+  });
+
+  renderUpcoming(buckets.upcoming);
+  renderActiveZones(buckets);
+  renderReturned(buckets.returned);
+  updateSummary(buckets);
+
+  // Show notice if any manual overrides exist
+  const hasOverrides = Object.keys(zoneMap).length > 0;
+  document.getElementById('unsavedNotice').classList.toggle('visible', hasOverrides);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER: UPCOMING ARRIVALS
+   ═══════════════════════════════════════════════════════════ */
+function renderUpcoming(plates) {
+  const el = document.getElementById('upcomingChips');
+  if (plates.length === 0) {
+    el.innerHTML = '<span class="upcoming-empty">No upcoming arrivals in the next 2 hours</span>';
+    return;
+  }
+  el.innerHTML = plates.map(plate => {
+    const arrival = apiArrivals.find(a => a.plate === plate);
+    const etaHtml = arrival
+      ? `<span class="uc-eta">in ${fmtEta(arrival.arrives_in_min)}</span>`
+      : `<span class="uc-arrived">arrived</span>`;
+    return `<div class="upcoming-chip" draggable="true" data-plate="${plate}" data-src="upcoming">
+      <span class="uc-plate">${plate}</span>${etaHtml}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.upcoming-chip').forEach(attachDrag);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER: ACTIVE ZONES
+   ═══════════════════════════════════════════════════════════ */
+function renderActiveZones(buckets) {
   ZONES.forEach(z => {
-    const plates = byZone[z];
+    const plates = buckets[z] || [];
     const cap = CAPS[z];
     const occ = plates.length;
     const pct = cap > 0 ? occ / cap : 0;
     const tier = pct >= 0.9 ? 'full' : pct >= 0.7 ? 'warn' : 'good';
 
-    // Badge
-    const badge = document.getElementById('badge-' + z);
-    badge.textContent = `${occ}/${cap}`;
-    badge.className = 'occ-pill occ-' + tier;
+    document.getElementById('badge-' + z).textContent = `${occ}/${cap}`;
+    document.getElementById('badge-' + z).className   = 'occ-pill occ-' + tier;
 
-    // Progress bar
     const bar = document.getElementById('bar-' + z);
-    bar.style.width = Math.round(pct * 100) + '%';
-    bar.className = 'zone-prog pg-' + tier;
+    bar.style.width  = Math.round(pct * 100) + '%';
+    bar.className    = 'zone-prog pg-' + tier;
 
-    // Plate grid
     const grid = document.getElementById('grid-' + z);
     if (plates.length === 0) {
       grid.innerHTML = `<span class="plate-empty">${emptyLabel(z)}</span>`;
     } else {
-      grid.innerHTML = plates.map(b =>
-        `<div class="plate-chip" draggable="true" data-plate="${b.plate}">${b.plate}</div>`
+      grid.innerHTML = plates.map(plate =>
+        `<div class="plate-chip" draggable="true" data-plate="${plate}" data-src="zone">
+          ${plate}
+          <button class="return-btn" title="Mark as returned to customer" onclick="event.stopPropagation();markReturned('${plate}')">
+            <i class="fas fa-check"></i>
+          </button>
+        </div>`
       ).join('');
       grid.querySelectorAll('.plate-chip').forEach(attachDrag);
     }
   });
+}
 
-  // Summary
-  const totOcc = ZONES.reduce((s, z) => s + byZone[z].length, 0);
+/* ═══════════════════════════════════════════════════════════
+   RENDER: RETURNED
+   ═══════════════════════════════════════════════════════════ */
+function renderReturned(plates) {
+  const pill = document.getElementById('returnedCountPill');
+  pill.textContent = plates.length === 1 ? '1 returned' : `${plates.length} returned`;
+
+  const el = document.getElementById('returnedChips');
+  if (plates.length === 0) {
+    el.innerHTML = '<span class="returned-empty">No cars returned yet today</span>';
+    return;
+  }
+  el.innerHTML = plates.map(plate =>
+    `<div class="returned-chip">
+      ${plate}
+      <button class="undo-btn" title="Undo — move back to active zones" onclick="undoReturned('${plate}')">
+        <i class="fas fa-undo"></i>
+      </button>
+    </div>`
+  ).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SUMMARY
+   ═══════════════════════════════════════════════════════════ */
+function updateSummary(buckets) {
+  const totOcc = ZONES.reduce((s, z) => s + (buckets[z] || []).length, 0);
   const totCap = ZONES.reduce((s, z) => s + CAPS[z], 0);
   document.getElementById('sumOccupied').textContent  = totOcc;
   document.getElementById('sumAvailable').textContent = totCap - totOcc;
-  document.getElementById('sumUtil').textContent       = Math.round(totOcc / totCap * 100) + '%';
-  document.getElementById('sumActive').textContent     = bookings.length;
+  document.getElementById('sumUtil').textContent      = Math.round(totOcc / totCap * 100) + '%';
+  document.getElementById('sumReturned').textContent  = buckets.returned.length;
 }
 
-function emptyLabel(z) {
-  return { reception: 'Drop-off area — no cars', gull: 'Short-term storage — empty',
-           p3: 'Long-term storage — empty', delivery: 'Pick-up area — no cars ready' }[z] || 'Empty';
-}
-
-/* ─── ARRIVING SOON ─── */
-function renderArrivingSoon(list) {
-  const el = document.getElementById('arrivingGrid');
-  if (!list || list.length === 0) {
-    el.innerHTML = '<span class="arriving-empty">No arrivals expected in the next 2 hours</span>';
-    return;
-  }
-  el.innerHTML = list.map(a => {
-    const eta = a.arrives_in_min < 60
-      ? `${a.arrives_in_min} min`
-      : `${(a.arrives_in_min / 60).toFixed(1).replace('.0','')} hr`;
-    return `<div class="arriving-chip">
-      <span class="ac-plate">${a.plate}</span>
-      <span class="ac-eta">in ${eta}</span>
-    </div>`;
-  }).join('');
-}
-
-/* ─── DRAG & DROP ─── */
+/* ═══════════════════════════════════════════════════════════
+   DRAG & DROP
+   ═══════════════════════════════════════════════════════════ */
 let dragPlate = null;
 const ghost = document.getElementById('drag-ghost');
 
-function attachDrag(chip) {
-  chip.addEventListener('dragstart', e => {
-    dragPlate = chip.dataset.plate;
-    chip.classList.add('dragging');
+function attachDrag(el) {
+  el.addEventListener('dragstart', e => {
+    dragPlate = el.dataset.plate;
+    el.classList.add('dragging');
     ghost.textContent = dragPlate;
-    ghost.style.display = 'block';
     e.dataTransfer.setDragImage(ghost, 0, 0);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', dragPlate);
-    setTimeout(() => { ghost.style.display = 'none'; }, 0);
   });
-  chip.addEventListener('dragend', () => {
-    chip.classList.remove('dragging');
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
     dragPlate = null;
   });
 }
 
-ZONES.forEach(z => {
-  const card = document.getElementById('zone-' + z);
-
-  card.addEventListener('dragover', e => {
+function makeDragTarget(el, onDrop) {
+  el.addEventListener('dragover', e => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    card.classList.add('drag-over');
-    if (!card.classList.contains('open')) card.classList.add('open');
+    el.classList.add('drag-over');
+    // Auto-open if it's a collapsible card
+    if (el.classList.contains('zone-card') && !el.classList.contains('open'))
+      el.classList.add('open');
+    if (el.classList.contains('returned-panel') && !el.classList.contains('open'))
+      el.classList.add('open');
   });
-
-  card.addEventListener('dragleave', e => {
-    if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over');
+  el.addEventListener('dragleave', e => {
+    if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
   });
-
-  card.addEventListener('drop', e => {
+  el.addEventListener('drop', e => {
     e.preventDefault();
-    card.classList.remove('drag-over');
+    el.classList.remove('drag-over');
     const plate = e.dataTransfer.getData('text/plain') || dragPlate;
-    if (!plate) return;
-    const booking = apiBookings.find(b => b.plate === plate);
-    if (!booking) return;
-    if (effectiveZone(booking) === z) return;
-    manualMap[plate] = z;
+    if (plate) onDrop(plate);
+  });
+}
+
+// Zone cards → move to zone
+ZONES.forEach(z => {
+  makeDragTarget(document.getElementById('zone-' + z), plate => {
+    if (returnedSet.has(plate)) returnedSet.delete(plate); // un-return if needed
+    zoneMap[plate] = z;
     hasEdits = true;
-    saveMap();
-    document.getElementById('unsavedNotice').classList.add('visible');
-    renderZones(apiBookings);
+    saveState();
+    rebuildAll();
   });
 });
 
-/* ─── API ─── */
+// Returned panel → mark returned
+makeDragTarget(document.getElementById('returnedPanel'), plate => {
+  markReturned(plate);
+});
+
+// Upcoming panel → return to upcoming (undo zone assignment)
+makeDragTarget(document.getElementById('upcomingPanel'), plate => {
+  if (returnedSet.has(plate)) returnedSet.delete(plate);
+  zoneMap[plate] = 'upcoming';
+  hasEdits = true;
+  saveState();
+  rebuildAll();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   API
+   ═══════════════════════════════════════════════════════════ */
 async function fetchStatus() {
   try {
     const r = await fetch('/api/live-status');
     const d = await r.json();
     if (!d.success) { setOffline(); return; }
 
+    // Update API data — don't override manual overrides
     apiBookings = d.active_bookings || [];
-    renderZones(apiBookings);
-    renderArrivingSoon(d.arriving_soon || []);
+    apiArrivals = d.arriving_soon   || [];
 
-    document.getElementById('connDot').className  = 'conn-dot';
+    rebuildAll();
+
+    document.getElementById('connDot').className    = 'conn-dot';
     document.getElementById('connText').textContent = 'Connected';
     const t = new Date(d.timestamp);
     document.getElementById('lastUpdated').textContent =
-      'Updated ' + t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      'Updated ' + t.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
     document.getElementById('dataSourceLabel').textContent =
       'Source: ' + (d.data_source === 'premium_parking_api' ? 'Live Parking API' : 'Simulated data');
   } catch { setOffline(); }
 }
 
 function setOffline() {
-  document.getElementById('connDot').className  = 'conn-dot off';
+  document.getElementById('connDot').className    = 'conn-dot off';
   document.getElementById('connText').textContent = 'Connection error';
 }
 
-/* ─── AUTO REFRESH ─── */
+/* ═══════════════════════════════════════════════════════════
+   AUTO-REFRESH
+   ═══════════════════════════════════════════════════════════ */
 let autoTimer = null, cdTimer = null, autoOn = false, cdSecs = 30;
 
 document.getElementById('autoBtn').addEventListener('click', () => {
@@ -667,7 +971,7 @@ document.getElementById('autoBtn').addEventListener('click', () => {
 function startCd() {
   cdSecs = 30; clearInterval(cdTimer);
   cdTimer = setInterval(() => {
-    cdSecs--; if (cdSecs <= 0) cdSecs = 30;
+    if (--cdSecs <= 0) cdSecs = 30;
     document.getElementById('nextUpdate').textContent = `Next refresh in ${cdSecs}s`;
   }, 1000);
 }
@@ -676,17 +980,43 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
   fetchStatus(); if (autoOn) startCd();
 });
 
+/* ═══════════════════════════════════════════════════════════
+   CONTROLS
+   ═══════════════════════════════════════════════════════════ */
 document.getElementById('resetZoneBtn').addEventListener('click', e => {
   e.preventDefault();
-  if (confirm('Reset all manual zone overrides? This cannot be undone.')) clearMap();
+  if (confirm('Reset all manual zone assignments? Returned cars will be kept.')) clearZoneOverrides();
 });
 
-/* ─── INIT ─── */
-loadMap();
-if (Object.keys(manualMap).length > 0) {
-  hasEdits = true;
-  document.getElementById('unsavedNotice').classList.add('visible');
+document.getElementById('clearReturnedBtn').addEventListener('click', () => {
+  if (confirm('Clear the returned-car history? This only affects this browser.')) {
+    returnedSet.clear();
+    saveState();
+    rebuildAll();
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function fmtEta(min) {
+  if (min < 60) return `${min} min`;
+  return `${+(min / 60).toFixed(1).replace(/\.0$/, '')} hr`;
 }
+
+function emptyLabel(z) {
+  return {
+    reception: 'Drop-off area — no cars',
+    gull:      'Short-term storage — empty',
+    p3:        'Long-term storage — empty',
+    delivery:  'Delivery staging — no cars ready',
+  }[z] || 'Empty';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+loadState();
 fetchStatus();
 </script>
 {% endblock %}
