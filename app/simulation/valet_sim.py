@@ -338,6 +338,95 @@ def _f(v) -> float:
     return float(v)
 
 
+def generate_fifo_plan(
+    bookings: List[ValetBooking],
+    base_time: datetime,
+    lead_time_min: float = 15.0,
+    duration_hours: float = 24.0,
+) -> OptimizationResult:
+    """
+    Generate a simple FIFO baseline plan: no optimisation, no forward scheduling.
+
+    Strategy:
+      1. Park each car in Gull or P3 (FIFO, fill Gull first) ~5 min after drop-off.
+      2. Retrieve each car to Delivery exactly `lead_time_min` before pickup —
+         but capped inside the simulation window so moves actually execute.
+         If the real pickup falls outside the window, we still retrieve the car
+         near the end of the window (simulating a shift that prepares cars in order).
+
+    This is deliberately naive vs the optimised plan.
+    """
+    movements = []
+    gull_used = 0
+    p3_used   = 0
+    horizon_end = base_time + timedelta(hours=duration_hours)
+
+    # Sort by departure (drop-off) time so FIFO assignment is honest
+    sorted_bookings = sorted(bookings, key=lambda b: b.departure_time)
+
+    # For bookings whose pickup falls outside the window, spread retrievals
+    # evenly across the last quarter of the window — still FIFO, just naive.
+    outside_window = [b for b in sorted_bookings if b.arrival_time > horizon_end]
+    window_quarter_start = base_time + timedelta(hours=duration_hours * 0.75)
+    spread_minutes = (duration_hours * 60 * 0.22)  # use 22% of total window
+    spread_step = spread_minutes / max(len(outside_window), 1)
+
+    outside_idx = 0
+
+    for b in sorted_bookings:
+        # Assign storage zone FIFO
+        if gull_used < settings.CAPACITY_GULL:
+            storage_zone = "gull"
+            gull_used += 1
+        else:
+            storage_zone = "p3"
+            p3_used += 1
+
+        # Move 1: reception → storage, 5 min after drop-off
+        park_time = b.departure_time + timedelta(minutes=5)
+        # Clamp to within window
+        park_time = max(park_time, base_time + timedelta(minutes=1))
+        park_time = min(park_time, horizon_end - timedelta(minutes=20))
+        movements.append({
+            "car":       b.booking_id,
+            "from_zone": "reception",
+            "to_zone":   storage_zone,
+            "time":      park_time.isoformat(),
+        })
+
+        # Move 2: storage → delivery
+        if b.arrival_time <= horizon_end:
+            # Pickup is within the simulation window: retrieve on time
+            retrieve_time = b.arrival_time - timedelta(minutes=lead_time_min)
+        else:
+            # Pickup is outside window: FIFO-spread retrievals inside the window
+            retrieve_time = window_quarter_start + timedelta(minutes=outside_idx * spread_step)
+            outside_idx += 1
+
+        # Ensure retrieve is after park
+        if retrieve_time <= park_time:
+            retrieve_time = park_time + timedelta(minutes=10)
+        # Ensure retrieve is within the window
+        retrieve_time = min(retrieve_time, horizon_end - timedelta(minutes=5))
+
+        movements.append({
+            "car":       b.booking_id,
+            "from_zone": storage_zone,
+            "to_zone":   "delivery",
+            "time":      retrieve_time.isoformat(),
+        })
+
+    return OptimizationResult(
+        status="fifo_baseline",
+        total_staff_hours=0,
+        staff_schedule=[],
+        car_movements=movements,
+        zone_occupancy={},
+        solve_time_seconds=0,
+        solver_used="fifo_baseline",
+    )
+
+
 def run_monte_carlo_simulation(
     bookings: List[ValetBooking],
     plan: OptimizationResult, 

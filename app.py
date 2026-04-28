@@ -17,8 +17,10 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from app.api.flights import generate_bookings_from_api
 from app.api.parking_api import get_real_valet_bookings, test_api_connection
 from app.optimization.valet_optimizer import ValetOptimizer
-from app.simulation.valet_sim import run_monte_carlo_simulation
+from app.simulation.valet_sim import run_monte_carlo_simulation, ValetSimulation, generate_fifo_plan
+from app.simulation.valet_sim_v2 import SimParams, run_scenario as run_scenario_v2
 from config import settings
+import numpy as np
 
 # ── Application setup ───────────────────────────────────────────────
 
@@ -432,6 +434,182 @@ def api_live_status():
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }), 500
+
+
+@app.route('/api/simulate-combined', methods=['POST'])
+def api_simulate_combined():
+    """Run optimized + baseline simulation together for comparison."""
+    try:
+        data = request.get_json()
+
+        base_time_str = data.get('base_time')
+        if base_time_str:
+            base_time = datetime.fromisoformat(base_time_str)
+        else:
+            base_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        n_runs         = int(data.get('n_runs', settings.SIM_RUNS))
+        duration_hours = float(data.get('duration_hours', 24))
+        delay_std      = float(data.get('delay_std', settings.SIM_FLIGHT_DELAY_STD))
+        drive_std      = float(data.get('drive_std', settings.SIM_DRIVE_TIME_STD))
+        n_customers    = int(data.get('n_customers', 60))
+        staff_count    = int(data.get('staff_count', settings.MAX_STAFF))
+        lead_time      = float(data.get('lead_time', settings.DELIVERY_LEAD_TIME))
+
+        # ── Generate bookings ──────────────────────────────────────────
+        bookings_data = data.get('bookings', [])
+        from app.api.flights import ValetBooking
+        if bookings_data:
+            bookings = []
+            for b in bookings_data:
+                booking = ValetBooking(
+                    booking_id=b['booking_id'],
+                    flight_out=b['flight_out'],
+                    flight_in=b['flight_in'],
+                    departure_time=datetime.fromisoformat(b['departure_time']),
+                    arrival_time=datetime.fromisoformat(b['arrival_time']),
+                    car_plate=b.get('car_plate', ''),
+                )
+                bookings.append(booking)
+        else:
+            bookings = generate_bookings_from_api(base_time, n_customers)
+
+        # ── Build a minimal plan for the simulation ────────────────────
+        # Run optimizer with the specified staff count
+        opt_settings_override = {
+            'delay_std': delay_std,
+            'drive_std': drive_std,
+            'staff_count': staff_count,
+            'lead_time': lead_time,
+        }
+
+        try:
+            result = optimizer.optimize(bookings, base_time)
+        except Exception:
+            from app.optimization.valet_optimizer import OptimizationResult
+            result = OptimizationResult(
+                status='heuristic',
+                total_staff_hours=0,
+                staff_schedule=[],
+                car_movements=[],
+                zone_occupancy={},
+                solve_time_seconds=0,
+                solver_used='none',
+            )
+
+        # ── Override simulation noise params on settings (thread-local safe enough for demo) ──
+        orig_delay = settings.SIM_FLIGHT_DELAY_STD
+        orig_drive = settings.SIM_DRIVE_TIME_STD
+        orig_staff = settings.MAX_STAFF
+        settings.SIM_FLIGHT_DELAY_STD = delay_std
+        settings.SIM_DRIVE_TIME_STD   = drive_std
+        settings.MAX_STAFF            = staff_count
+
+        try:
+            # ── Optimized simulation ───────────────────────────────────
+            opt_result = run_monte_carlo_simulation(
+                bookings, result, base_time, n_runs, duration_hours
+            )
+
+            # ── Baseline simulation (FIFO — naive scheduling, no optimisation) ──
+            baseline_plan = generate_fifo_plan(bookings, base_time, lead_time_min=lead_time, duration_hours=duration_hours)
+            base_result = run_monte_carlo_simulation(
+                bookings, baseline_plan, base_time, n_runs, duration_hours
+            )
+        finally:
+            settings.SIM_FLIGHT_DELAY_STD = orig_delay
+            settings.SIM_DRIVE_TIME_STD   = orig_drive
+            settings.MAX_STAFF            = orig_staff
+
+        # ── Build per-run chart data ───────────────────────────────────
+        opt_sls  = [r['service_level'] for r in opt_result.get('results', [])]
+        base_sls = [r['service_level'] for r in base_result.get('results', [])]
+
+        # Avg earliness = negative of avg_wait_time (car ready before customer)
+        def avg_earliness(res):
+            wt = res.get('summary', {}).get('avg_wait_time', {}).get('mean', 0)
+            return max(0, -wt)
+
+        # Zone peak occupancy (average across runs)
+        def avg_zone_peak(res):
+            peaks = {}
+            for r in res.get('results', []):
+                for zone, val in r.get('zone_max_occupancy', {}).items():
+                    peaks.setdefault(zone, []).append(val)
+            return {z: float(np.mean(v)) for z, v in peaks.items()}
+
+        return jsonify({
+            'success': True,
+            'n_runs': n_runs,
+            'bookings_count': len(bookings),
+            'params': {
+                'staff_count': staff_count,
+                'duration_hours': duration_hours,
+                'delay_std': delay_std,
+                'drive_std': drive_std,
+                'n_customers': n_customers,
+                'lead_time': lead_time,
+            },
+            'optimized': {
+                'summary': opt_result.get('summary', {}),
+                'service_levels': opt_sls,
+                'avg_earliness_min': avg_earliness(opt_result),
+                'zone_peak': avg_zone_peak(opt_result),
+                'recommendations': opt_result.get('recommendations', []),
+            },
+            'baseline': {
+                'summary': base_result.get('summary', {}),
+                'service_levels': base_sls,
+                'avg_earliness_min': avg_earliness(base_result),
+                'zone_peak': avg_zone_peak(base_result),
+            },
+            'timestamp': datetime.utcnow().isoformat(),
+        })
+
+    except Exception as e:
+        log.error('simulate-combined error: %s', e, exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/scenario', methods=['POST'])
+def api_scenario():
+    """Run one or two named scenarios using the v2 simulation engine."""
+    try:
+        data = request.get_json()
+
+        def _build_params(d):
+            return SimParams(
+                date_start             = d.get('date_start',             '2025-06-01'),
+                date_end               = d.get('date_end',               '2025-06-30'),
+                n_runs                 = int(d.get('n_runs',             10)),
+                staff_day              = int(d.get('staff_day',          3)),
+                staff_night            = int(d.get('staff_night',        2)),
+                has_supervisor         = bool(d.get('has_supervisor',    True)),
+                retrieval_lead         = int(d.get('retrieval_lead',     90)),
+                stochastic             = bool(d.get('stochastic',        True)),
+                flight_delay_std       = float(d.get('flight_delay_std', 15.0)),
+                drive_time_variability = float(d.get('drive_time_variability', 0.15)),
+                demand_scale           = float(d.get('demand_scale',     1.0)),
+            )
+
+        scenario_a = _build_params(data.get('scenario_a', data))
+        result_a   = run_scenario_v2(scenario_a)
+
+        result_b = None
+        if data.get('scenario_b'):
+            scenario_b = _build_params(data['scenario_b'])
+            result_b   = run_scenario_v2(scenario_b)
+
+        return jsonify({
+            'success':    True,
+            'scenario_a': result_a,
+            'scenario_b': result_b,
+            'timestamp':  datetime.utcnow().isoformat(),
+        })
+
+    except Exception as e:
+        log.error('scenario error: %s', e, exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/test-parking-api')
