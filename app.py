@@ -407,6 +407,19 @@ def api_live_status():
             occupancy["p3"] = min(occupancy["p3"], settings.CAPACITY_P3)
             occupancy["delivery"] = min(occupancy["delivery"], settings.CAPACITY_DELIVERY)
         
+        # Arriving soon: cars expected within the next 2 hours
+        arriving_soon = []
+        for b in bookings:
+            minutes_until_arrival = (b.departure_time - now).total_seconds() / 60
+            if 0 < minutes_until_arrival <= 120:
+                arriving_soon.append({
+                    "id": b.booking_id,
+                    "plate": getattr(b, 'car_plate', f"***{b.booking_id[-3:]}"),
+                    "arrives_in_min": int(minutes_until_arrival),
+                    "flight": getattr(b, 'flight_out', 'N/A'),
+                })
+        arriving_soon.sort(key=lambda x: x["arrives_in_min"])
+
         return jsonify({
             "success": True,
             "timestamp": now.isoformat(),
@@ -424,7 +437,8 @@ def api_live_status():
                 "p3": settings.CAPACITY_P3 - occupancy["p3"],
                 "delivery": settings.CAPACITY_DELIVERY - occupancy["delivery"]
             },
-            "active_bookings": active_bookings
+            "active_bookings": active_bookings,
+            "arriving_soon": arriving_soon
         })
         
     except Exception as e:
