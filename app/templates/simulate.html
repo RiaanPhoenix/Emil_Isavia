@@ -1,246 +1,744 @@
 {% extends "base.html" %}
-
-{% block title %}Emil Isavia — Simulation & Evaluation{% endblock %}
+{% block title %}Emil Isavia — Simulation{% endblock %}
 
 {% block content %}
 
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="mb-1">Simulation &amp; Evaluation</h1>
-        <p class="text-muted mb-0">
-            Stress-test optimization results · Compare against baseline · Explore uncertainty
-        </p>
-    </div>
+<!-- ── Page Header ─────────────────────────────────────────────── -->
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="mb-1">Operations Simulation</h1>
+    <p class="text-muted mb-0">
+      Test planning assumptions before they happen · Adjust staffing, demand, and uncertainty · Compare two scenarios side by side
+    </p>
+  </div>
+  <div class="sim-workflow-steps d-flex align-items-center gap-2">
+    <div class="sim-step active" id="step1"><span class="sim-step-num">1</span> Configure</div>
+    <div class="sim-step-arrow">›</div>
+    <div class="sim-step" id="step2"><span class="sim-step-num">2</span> Simulate</div>
+    <div class="sim-step-arrow">›</div>
+    <div class="sim-step" id="step3"><span class="sim-step-num">3</span> Compare</div>
+    <div class="sim-step-arrow">›</div>
+    <div class="sim-step" id="step4"><span class="sim-step-num">4</span> Review</div>
+  </div>
 </div>
 
-<div class="row">
+<!-- ── Scenario Config ─────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
 
-    <!-- Left: Sim Config -->
-    <div class="col-lg-5">
-
-        <div class="card mb-4">
-            <div class="card-header"><i class="fas fa-sliders-h"></i> Parameters</div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Simulation Runs</label>
-                    <select class="form-control" id="numRuns">
-                        <option value="5">5 runs — fast</option>
-                        <option value="10" selected>10 runs — default</option>
-                        <option value="20">20 runs — thorough</option>
-                        <option value="50">50 runs — high fidelity</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Duration (hours)</label>
-                    <input type="number" class="form-control" id="duration" value="24" min="1" max="72">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Flight Delay Std Dev (minutes)</label>
-                    <input type="number" class="form-control" id="delayStd" value="15" min="0" max="60">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Drive Time Variability</label>
-                    <input type="number" class="form-control" id="driveStd" value="0.15" min="0" max="0.5" step="0.01">
-                    <div class="form-text">Std dev as fraction of base travel time</div>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Compare Against</label>
-                    <select class="form-control" id="compareMode">
-                        <option value="none">No comparison</option>
-                        <option value="baseline">Simple baseline (FIFO)</option>
-                    </select>
-                </div>
-                <button class="btn btn-optimize w-100" onclick="runSimulation()" id="simBtn">
-                    <i class="fas fa-play"></i> Run Simulation
-                </button>
+  <!-- Scenario A -->
+  <div class="col-lg-6">
+    <div class="card scenario-card scenario-a-card h-100">
+      <div class="card-header scenario-header-a">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2">
+            <div class="scenario-badge-a"><i class="fas fa-star"></i></div>
+            <div>
+              <div class="fw-600">Scenario A — Your Plan</div>
+              <div style="font-size:0.72rem;opacity:0.85;">The planning strategy you want to evaluate</div>
             </div>
+          </div>
         </div>
-
-        <div class="card">
-            <div class="card-header"><i class="fas fa-info-circle"></i> What This Does</div>
-            <div class="card-body text-muted small">
-                <p>
-                    The simulation runs multiple stochastic replications of a day's operations using
-                    a SimPy discrete-event model. Each run introduces random flight delays and drive-time
-                    variability to test how well an optimization plan holds up.
-                </p>
-                <p>
-                    <strong class="text-body">Optimizer vs Baseline:</strong> When comparison is enabled,
-                    the simulation also runs a simple FIFO heuristic (park in nearest available zone,
-                    no forward scheduling) and compares service levels and violations.
-                </p>
-                <p class="mb-0">
-                    <strong class="text-body">Key metric:</strong> Service level = % of cars delivered on time (≥15 min lead time).
-                </p>
-            </div>
-        </div>
-
+      </div>
+      <div class="card-body" id="scenarioABody">
+      </div>
     </div>
+  </div>
 
-    <!-- Right: Results -->
-    <div class="col-lg-7">
-
-        <div id="simPlaceholder" class="card">
-            <div class="card-body text-center text-muted py-5">
-                <i class="fas fa-flask fa-3x mb-3 d-block" style="opacity:0.2;"></i>
-                <p class="mb-1">Configure parameters and run the simulation</p>
-                <small>Go to the <a href="/" class="text-muted">Dashboard</a> to run the optimizer first,
-                then return here to evaluate</small>
+  <!-- Scenario B -->
+  <div class="col-lg-6">
+    <div class="card scenario-card scenario-b-card h-100">
+      <div class="card-header scenario-header-b">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2">
+            <div class="scenario-badge-b"><i class="fas fa-balance-scale"></i></div>
+            <div>
+              <div class="fw-600">Scenario B — Comparison</div>
+              <div style="font-size:0.72rem;opacity:0.85;">Change one or more variables to see the difference</div>
             </div>
+          </div>
+          <div class="form-check form-switch mb-0 ms-2">
+            <input class="form-check-input" type="checkbox" id="enableB" checked>
+            <label class="form-check-label" for="enableB" style="font-size:0.78rem;">Enable</label>
+          </div>
         </div>
-
-        <div id="simResults" style="display:none;">
-
-            <!-- Summary Cards -->
-            <div class="row g-3 mb-4">
-                <div class="col-4">
-                    <div class="stat-card">
-                        <div class="stat-value text-success" id="simServiceLevel">—</div>
-                        <div class="stat-label">Service Level</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="stat-card">
-                        <div class="stat-value text-danger" id="simViolations">—</div>
-                        <div class="stat-label">Total Violations</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="stat-card">
-                        <div class="stat-value" id="simRuns">—</div>
-                        <div class="stat-label">Runs</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Optimizer result detail -->
-            <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-cogs"></i> Optimizer Results</div>
-                <div class="card-body">
-                    <div class="result-row">
-                        <div class="result-stat">
-                            <span class="result-value" id="simMeanSL">—</span>
-                            <span class="result-label">Mean service level</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value" id="simMinSL">—</span>
-                            <span class="result-label">Worst run</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value" id="simMaxSL">—</span>
-                            <span class="result-label">Best run</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Baseline comparison (shown only when enabled) -->
-            <div class="card mb-4" id="baselineCard" style="display:none;">
-                <div class="card-header"><i class="fas fa-balance-scale"></i> vs. Baseline (FIFO)</div>
-                <div class="card-body">
-                    <div class="result-row">
-                        <div class="result-stat">
-                            <span class="result-value text-success" id="cmpOptSL">—</span>
-                            <span class="result-label">Optimizer SL</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value text-muted" id="cmpBaseSL">—</span>
-                            <span class="result-label">Baseline SL</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value" id="cmpDelta">—</span>
-                            <span class="result-label">Improvement</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Raw output -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-terminal"></i> Raw Output</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleRaw()">Toggle</button>
-                </div>
-                <div class="card-body" id="rawOutput" style="display:none;">
-                    <pre class="raw-pre" id="rawPre"></pre>
-                </div>
-            </div>
-
-        </div>
+      </div>
+      <div class="card-body" id="scenarioBBody">
+      </div>
     </div>
+  </div>
 </div>
+
+<!-- Run button -->
+<div class="text-center mb-4">
+  <button class="btn btn-optimize btn-lg px-5" onclick="runScenarios()" id="simBtn">
+    <i class="fas fa-play me-2"></i>Run Simulation
+  </button>
+  <button class="btn btn-outline-secondary ms-2" onclick="resetScenarios()">
+    <i class="fas fa-undo me-1"></i>Reset
+  </button>
+</div>
+
+<!-- ── Results ──────────────────────────────────────────────────── -->
+<div id="simPlaceholder" class="sim-placeholder-card mb-4">
+  <div class="text-center py-5">
+    <div class="sim-placeholder-icon mb-3"><i class="fas fa-flask"></i></div>
+    <h5 class="text-muted mb-2">No simulation run yet</h5>
+    <p class="text-muted mb-0" style="font-size:0.84rem;">Configure both scenarios above, then click <strong>Run Simulation</strong></p>
+  </div>
+</div>
+
+<div id="simResults" style="display:none;">
+
+  <!-- Run banner -->
+  <div class="sim-run-banner mb-3" id="runBanner">
+    <i class="fas fa-check-circle me-2"></i><span id="runBannerText">Simulation complete</span>
+  </div>
+
+  <!-- Side-by-side KPI cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card comparison-card h-100">
+        <div class="card-header comparison-header-a">
+          <div class="d-flex align-items-center gap-2">
+            <div class="comparison-badge-a"><i class="fas fa-star"></i></div>
+            <div>
+              <div class="fw-600">Scenario A</div>
+              <div style="font-size:0.72rem;opacity:0.85;" id="aLabel">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="kpi-grid" id="aKpis">
+            <div class="kpi-item kpi-primary"><div class="kpi-value" id="aSL">—</div><div class="kpi-label">Service Level</div></div>
+            <div class="kpi-item"><div class="kpi-value text-danger" id="aLate">—</div><div class="kpi-label">Late Cars</div></div>
+            <div class="kpi-item"><div class="kpi-value text-success" id="aEarly">—</div><div class="kpi-label">Avg Earliness</div></div>
+            <div class="kpi-item"><div class="kpi-value" id="aCars">—</div><div class="kpi-label">Total Cars</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6" id="bCardCol">
+      <div class="card comparison-card h-100">
+        <div class="card-header comparison-header-b">
+          <div class="d-flex align-items-center gap-2">
+            <div class="comparison-badge-b"><i class="fas fa-balance-scale"></i></div>
+            <div>
+              <div class="fw-600">Scenario B</div>
+              <div style="font-size:0.72rem;opacity:0.85;" id="bLabel">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="kpi-grid">
+            <div class="kpi-item"><div class="kpi-value text-muted" id="bSL">—</div><div class="kpi-label">Service Level</div></div>
+            <div class="kpi-item"><div class="kpi-value text-danger" id="bLate">—</div><div class="kpi-label">Late Cars</div></div>
+            <div class="kpi-item"><div class="kpi-value text-muted" id="bEarly">—</div><div class="kpi-label">Avg Earliness</div></div>
+            <div class="kpi-item"><div class="kpi-value text-muted" id="bCars">—</div><div class="kpi-label">Total Cars</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delta strip -->
+  <div class="card delta-card mb-4" id="deltaCard" style="display:none;">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="delta-title"><i class="fas fa-arrow-trend-up me-2"></i>A vs B Difference</div>
+        <div class="d-flex gap-4 flex-wrap">
+          <div class="delta-item"><span class="delta-label">Service Level</span><span class="delta-value" id="deltaSL">—</span></div>
+          <div class="delta-divider"></div>
+          <div class="delta-item"><span class="delta-label">Late Cars</span><span class="delta-value" id="deltaLate">—</span></div>
+          <div class="delta-divider"></div>
+          <div class="delta-item"><span class="delta-label">Avg Earliness</span><span class="delta-value" id="deltaEarly">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Level by Run chart -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-chart-bar me-2"></i>Service Level by Run</span>
+      <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:0.72rem;" id="chartRunCount"></span>
+    </div>
+    <div class="card-body">
+      <div style="position:relative;height:220px;">
+        <canvas id="slChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone Peak Occupancy -->
+  <div class="card mb-4">
+    <div class="card-header"><i class="fas fa-warehouse me-2"></i>Zone Peak Occupancy <span class="text-muted ms-1" style="font-size:0.78rem;">(avg across runs)</span></div>
+    <div class="card-body">
+      <div id="zonePeakGrid" class="zone-peak-grid"></div>
+    </div>
+  </div>
+
+  <!-- Comparison table + CSV export -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-table me-2"></i>Comparison Table</span>
+      <button class="btn btn-sm btn-outline-secondary" id="csvDownloadBtn">
+        <i class="fas fa-download me-1"></i>Export CSV
+      </button>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 comparison-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th><span class="badge" style="background:var(--accent);font-size:0.72rem;"><i class="fas fa-star me-1"></i>Scenario A</span></th>
+              <th><span class="badge" style="background:var(--red);font-size:0.72rem;"><i class="fas fa-balance-scale me-1"></i>Scenario B</span></th>
+              <th>Difference (A − B)</th>
+            </tr>
+          </thead>
+          <tbody id="csvTableBody">
+            <tr><td colspan="4" class="text-center text-muted py-3">Run a simulation to populate this table</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raw JSON -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-terminal me-2"></i>Raw JSON Output</span>
+      <button class="btn btn-sm btn-outline-secondary" onclick="toggleRaw()">Show / Hide</button>
+    </div>
+    <div class="card-body" id="rawOutput" style="display:none;">
+      <pre class="raw-pre" id="rawPre"></pre>
+    </div>
+  </div>
+
+</div><!-- /simResults -->
 
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-function runSimulation() {
-    const btn = document.getElementById('simBtn');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Simulating…';
-    btn.disabled = true;
+// ── Build scenario form HTML ────────────────────────────────────────
+function scenarioFormHTML(prefix) {
+  return `
+  <div class="sim-param-group mb-3">
+    <div class="sim-param-group-label">Date Range</div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="form-control" id="${prefix}_date_start" value="2025-06-01">
+      </div>
+      <div class="col-6">
+        <label class="form-label">End Date</label>
+        <input type="date" class="form-control" id="${prefix}_date_end" value="2025-06-30">
+      </div>
+    </div>
+  </div>
 
-    document.getElementById('simPlaceholder').style.display = 'none';
-    document.getElementById('simResults').style.display = 'none';
+  <div class="sim-param-group mb-3">
+    <div class="sim-param-group-label">Staffing</div>
+    <div class="row g-2">
+      <div class="col-4">
+        <label class="form-label">Day Staff <small class="text-muted">(05:30–17:30)</small></label>
+        <input type="number" class="form-control" id="${prefix}_staff_day" value="3" min="1" max="10">
+      </div>
+      <div class="col-4">
+        <label class="form-label">Night Staff <small class="text-muted">(17:30–05:30)</small></label>
+        <input type="number" class="form-control" id="${prefix}_staff_night" value="2" min="1" max="10">
+      </div>
+      <div class="col-4">
+        <label class="form-label">Supervisor</label>
+        <div class="form-control d-flex align-items-center" style="height:38px;">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="${prefix}_has_supervisor" checked>
+            <label class="form-check-label" for="${prefix}_has_supervisor" style="font-size:0.8rem;">08:00–20:00</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="form-text mt-1">One staff member always on phone duty — automatically subtracted from movers.</div>
+  </div>
 
-    const data = {
-        n_runs: parseInt(document.getElementById('numRuns').value),
-        duration_hours: parseInt(document.getElementById('duration').value),
-        delay_std: parseFloat(document.getElementById('delayStd').value),
-        drive_std: parseFloat(document.getElementById('driveStd').value),
-        bookings: [],
-        optimization_plan: {}
-    };
+  <div class="sim-param-group mb-3">
+    <div class="sim-param-group-label">Simulation Settings</div>
+    <div class="row g-2">
+      <div class="col-4">
+        <label class="form-label">Runs</label>
+        <select class="form-control form-select" id="${prefix}_n_runs">
+          <option value="5">5 — fast</option>
+          <option value="10" selected>10 — default</option>
+          <option value="20">20 — thorough</option>
+          <option value="50">50 — high fidelity</option>
+        </select>
+      </div>
+      <div class="col-4">
+        <label class="form-label">Retrieval Lead</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="${prefix}_retrieval_lead" value="90" min="15" max="300" step="5">
+          <span class="input-group-text text-muted" style="font-size:0.74rem;">min</span>
+        </div>
+      </div>
+      <div class="col-4">
+        <label class="form-label">Demand Scale</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="${prefix}_demand_scale" value="1.0" min="0.3" max="2.0" step="0.1">
+          <span class="input-group-text text-muted" style="font-size:0.74rem;">×</span>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    fetch('/api/simulate', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(res => {
-        document.getElementById('simResults').style.display = 'block';
-        const s = res.simulation_result || {};
-        const summary = s.summary || {};
-        const sl = summary.service_level || {};
-        const viol = summary.violations || {};
+  <div class="sim-param-group">
+    <div class="sim-param-group-label">Uncertainty</div>
+    <div class="row g-2 align-items-end">
+      <div class="col-4">
+        <label class="form-label">Stochastic</label>
+        <div class="form-control d-flex align-items-center" style="height:38px;">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="${prefix}_stochastic" checked>
+            <label class="form-check-label" for="${prefix}_stochastic" style="font-size:0.8rem;">On</label>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <label class="form-label">Flight Delay σ</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="${prefix}_flight_delay_std" value="15" min="0" max="60">
+          <span class="input-group-text text-muted" style="font-size:0.74rem;">min</span>
+        </div>
+      </div>
+      <div class="col-4">
+        <label class="form-label">Drive Variability</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="${prefix}_drive_var" value="0.15" min="0" max="0.5" step="0.01">
+          <span class="input-group-text text-muted" style="font-size:0.74rem;">σ</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
+}
 
-        document.getElementById('simServiceLevel').textContent  = sl.mean != null ? sl.mean.toFixed(1) + '%' : '—';
-        document.getElementById('simViolations').textContent    = viol.total_across_runs != null ? viol.total_across_runs : '—';
-        document.getElementById('simRuns').textContent          = s.n_runs || data.n_runs;
-        document.getElementById('simMeanSL').textContent        = sl.mean  != null ? sl.mean.toFixed(1)  + '%' : '—';
-        document.getElementById('simMinSL').textContent         = sl.min   != null ? sl.min.toFixed(1)   + '%' : '—';
-        document.getElementById('simMaxSL').textContent         = sl.max   != null ? sl.max.toFixed(1)   + '%' : '—';
+// Inject forms
+document.getElementById('scenarioABody').innerHTML = scenarioFormHTML('a');
+document.getElementById('scenarioBBody').innerHTML = scenarioFormHTML('b');
 
-        document.getElementById('rawPre').textContent = JSON.stringify(res, null, 2);
+// ── Defaults ────────────────────────────────────────────────────────
+const DEFAULTS = {
+  date_start:'2025-06-01', date_end:'2025-06-30', n_runs:'10',
+  staff_day:'3', staff_night:'2', has_supervisor:true,
+  retrieval_lead:'90', demand_scale:'1.0',
+  stochastic:true, flight_delay_std:'15', drive_var:'0.15',
+};
 
-        showToast('Simulation complete · ' + (s.n_runs || data.n_runs) + ' runs', 'success');
-    })
-    .catch(e => {
-        document.getElementById('simPlaceholder').style.display = 'block';
-        showToast('Simulation failed: ' + e.message, 'danger');
-    })
-    .finally(() => {
-        btn.innerHTML = '<i class="fas fa-play"></i> Run Simulation';
-        btn.disabled = false;
+function resetScenarios() {
+  ['a','b'].forEach(p => {
+    ['date_start','date_end','n_runs','staff_day','staff_night',
+     'retrieval_lead','demand_scale','flight_delay_std','drive_var'].forEach(k => {
+      const el = document.getElementById(`${p}_${k}`);
+      if (el) el.value = DEFAULTS[k];
     });
+    ['has_supervisor','stochastic'].forEach(k => {
+      const el = document.getElementById(`${p}_${k}`);
+      if (el) el.checked = DEFAULTS[k];
+    });
+  });
 }
 
-function toggleRaw() {
-    const el = document.getElementById('rawOutput');
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+function getScenarioParams(prefix) {
+  const g = id => document.getElementById(`${prefix}_${id}`);
+  return {
+    date_start:             g('date_start').value,
+    date_end:               g('date_end').value,
+    n_runs:                 parseInt(g('n_runs').value),
+    staff_day:              parseInt(g('staff_day').value),
+    staff_night:            parseInt(g('staff_night').value),
+    has_supervisor:         g('has_supervisor').checked,
+    retrieval_lead:         parseInt(g('retrieval_lead').value),
+    demand_scale:           parseFloat(g('demand_scale').value),
+    stochastic:             g('stochastic').checked,
+    flight_delay_std:       parseFloat(g('flight_delay_std').value),
+    drive_time_variability: parseFloat(g('drive_var').value),
+  };
 }
+
+// ── Workflow steps ───────────────────────────────────────────────────
+function setStep(n) {
+  [1,2,3,4].forEach(i =>
+    document.getElementById('step'+i).classList.toggle('active', i <= n));
+}
+
+// ── Run ──────────────────────────────────────────────────────────────
+let slChartInstance = null;
+
+async function runScenarios() {
+  const btn = document.getElementById('simBtn');
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Simulating…';
+  btn.disabled = true;
+  setStep(2);
+  document.getElementById('simPlaceholder').style.display = 'none';
+  document.getElementById('simResults').style.display = 'none';
+
+  const bEnabled = document.getElementById('enableB').checked;
+  const payload  = {
+    scenario_a: getScenarioParams('a'),
+    scenario_b: bEnabled ? getScenarioParams('b') : null,
+  };
+
+  try {
+    const res  = await fetch('/api/scenario', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Simulation failed');
+    renderResults(json, bEnabled);
+    setStep(4);
+    const nRuns = json.scenario_a?.params?.n_runs || '?';
+    const cnt   = json.scenario_a?.bookings_count || '?';
+    showToast(`Simulation complete — ${nRuns} runs, ${cnt} bookings`, 'success');
+  } catch(e) {
+    document.getElementById('simPlaceholder').style.display = 'block';
+    setStep(1);
+    showToast('Error: ' + e.message, 'danger');
+  } finally {
+    btn.innerHTML = '<i class="fas fa-play me-2"></i>Run Simulation';
+    btn.disabled = false;
+  }
+}
+
+// ── Render ───────────────────────────────────────────────────────────
+function renderResults(data, bEnabled) {
+  document.getElementById('simResults').style.display = 'block';
+
+  const a = data.scenario_a;
+  const b = data.scenario_b;
+
+  // Banner
+  const pa = a.params;
+  document.getElementById('runBannerText').textContent =
+    `${pa.n_runs} runs · ${a.bookings_count || '?'} bookings · ` +
+    `${pa.date_start} → ${pa.date_end} · ` +
+    `day staff ${pa.staff_day}, night ${pa.staff_night}`;
+
+  // Scenario labels
+  document.getElementById('aLabel').textContent =
+    `${pa.date_start} → ${pa.date_end} · ${pa.staff_day}d/${pa.staff_night}n · lead ${pa.retrieval_lead}min`;
+
+  // A KPIs
+  const as = a.summary;
+  set('aSL',    pct(as.service_level?.mean));
+  set('aLate',  fmt1(as.late_count?.mean));
+  set('aEarly', fmt1(as.avg_earliness?.mean) + ' min');
+  set('aCars',  a.bookings_count || '—');
+
+  // B KPIs
+  document.getElementById('bCardCol').style.display = bEnabled && b ? 'block' : 'none';
+  document.getElementById('deltaCard').style.display = bEnabled && b ? 'block' : 'none';
+
+  if (bEnabled && b) {
+    const pb = b.params;
+    document.getElementById('bLabel').textContent =
+      `${pb.date_start} → ${pb.date_end} · ${pb.staff_day}d/${pb.staff_night}n · lead ${pb.retrieval_lead}min`;
+    const bs = b.summary;
+    set('bSL',    pct(bs.service_level?.mean));
+    set('bLate',  fmt1(bs.late_count?.mean));
+    set('bEarly', fmt1(bs.avg_earliness?.mean) + ' min');
+    set('bCars',  b.bookings_count || '—');
+
+    // Deltas
+    const slDiff   = diff(as.service_level?.mean,  bs.service_level?.mean);
+    const lateDiff = diff(as.late_count?.mean,      bs.late_count?.mean);
+    const earlyDiff= diff(as.avg_earliness?.mean,   bs.avg_earliness?.mean);
+
+    const dslEl = document.getElementById('deltaSL');
+    dslEl.textContent = slDiff != null ? signPct(slDiff) : '—';
+    dslEl.className   = 'delta-value ' + (slDiff > 0 ? 'text-success' : slDiff < 0 ? 'text-danger' : '');
+
+    const dlEl = document.getElementById('deltaLate');
+    dlEl.textContent = lateDiff != null ? sign(lateDiff.toFixed(1)) : '—';
+    dlEl.className   = 'delta-value ' + (lateDiff < 0 ? 'text-success' : lateDiff > 0 ? 'text-danger' : '');
+
+    const deEl = document.getElementById('deltaEarly');
+    deEl.textContent = earlyDiff != null ? sign(earlyDiff.toFixed(1)) + ' min' : '—';
+    deEl.className   = 'delta-value ' + (earlyDiff > 0 ? 'text-success' : earlyDiff < 0 ? 'text-danger' : '');
+  }
+
+  // Chart
+  const aRuns = (a.replications || []).map(r => parseFloat((r.service_level * 100).toFixed(1)));
+  const bRuns = bEnabled && b ? (b.replications || []).map(r => parseFloat((r.service_level * 100).toFixed(1))) : null;
+  renderChart(aRuns, bRuns, pa.n_runs);
+
+  // Zone peaks
+  const aPeaks = {
+    reception: as.reception_peak?.mean,
+    gull:      as.gull_peak?.mean,
+    p3:        as.p3_peak?.mean,
+    return:    as.return_peak?.mean,
+  };
+  const bPeaks = (bEnabled && b) ? {
+    reception: b.summary.reception_peak?.mean,
+    gull:      b.summary.gull_peak?.mean,
+    p3:        b.summary.p3_peak?.mean,
+    return:    b.summary.return_peak?.mean,
+  } : null;
+  renderZonePeaks(aPeaks, bPeaks);
+
+  // Table + CSV
+  renderTable(a, b, bEnabled);
+
+  // Raw
+  document.getElementById('rawPre').textContent = JSON.stringify(data, null, 2);
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────
+function renderChart(aRuns, bRuns, nRuns) {
+  if (slChartInstance) slChartInstance.destroy();
+
+  const labels   = aRuns.map((_, i) => 'Run ' + (i + 1));
+  document.getElementById('chartRunCount').textContent = nRuns + ' runs';
+
+  const datasets = [{
+    label: 'Scenario A',
+    data:  aRuns,
+    backgroundColor: 'rgba(37,99,235,0.80)',
+    borderColor:     'rgba(37,99,235,1)',
+    borderWidth: 1, borderRadius: 4,
+  }];
+
+  if (bRuns) {
+    datasets.push({
+      label: 'Scenario B',
+      data:  bRuns,
+      backgroundColor: 'rgba(220,38,38,0.65)',
+      borderColor:     'rgba(185,28,28,1)',
+      borderWidth: 1, borderRadius: 4,
+    });
+  }
+
+  slChartInstance = new Chart(document.getElementById('slChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { font: { family:'Inter', size:11 }, color:'#6b7a8d' } },
+        tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + c.parsed.y + '%' } },
+      },
+      scales: {
+        y: { min:0, max:100,
+          ticks: { callback: v => v+'%', font:{family:'Inter',size:11}, color:'#8a9ab0' },
+          grid: { color:'rgba(226,231,237,0.6)' } },
+        x: { ticks: { font:{family:'Inter',size:11}, color:'#8a9ab0' }, grid: { display:false } },
+      }
+    }
+  });
+}
+
+// ── Zone Peaks ────────────────────────────────────────────────────────
+const ZONE_META = {
+  reception: { label:'Reception (Móttaka)', capacity:14,  color:'var(--accent)' },
+  gull:      { label:'Gull Storage',        capacity:50,  color:'var(--amber)'  },
+  p3:        { label:'P3 Storage',          capacity:150, color:'var(--slate)'  },
+  return:    { label:'Return (Skil)',        capacity:20,  color:'var(--green)'  },
+};
+
+function renderZonePeaks(aPeaks, bPeaks) {
+  const c = document.getElementById('zonePeakGrid');
+  c.innerHTML = '';
+  Object.entries(ZONE_META).forEach(([z, meta]) => {
+    const av = aPeaks[z] != null ? Math.round(aPeaks[z]) : null;
+    const bv = bPeaks && bPeaks[z] != null ? Math.round(bPeaks[z]) : null;
+    const cap = meta.capacity;
+    const aPct = av != null ? Math.min(100, av/cap*100) : 0;
+    const bPct = bv != null ? Math.min(100, bv/cap*100) : 0;
+
+    const item = document.createElement('div');
+    item.className = 'zone-peak-item';
+    item.innerHTML = `
+      <div class="zone-peak-name">${meta.label}</div>
+      <div class="zone-peak-cap text-muted">Capacity: ${cap}</div>
+      <div class="zone-peak-bars">
+        <div class="zone-peak-bar-row">
+          <span class="zone-peak-bar-label">Scenario A</span>
+          <div class="zone-peak-bar-track"><div class="zone-peak-bar-fill" style="width:${aPct}%;background:${meta.color};"></div></div>
+          <span class="zone-peak-bar-val">${av ?? '—'}</span>
+        </div>
+        ${bv != null ? `
+        <div class="zone-peak-bar-row">
+          <span class="zone-peak-bar-label text-muted">Scenario B</span>
+          <div class="zone-peak-bar-track"><div class="zone-peak-bar-fill" style="width:${bPct}%;background:var(--red);"></div></div>
+          <span class="zone-peak-bar-val text-muted">${bv}</span>
+        </div>` : ''}
+      </div>
+    `;
+    c.appendChild(item);
+  });
+}
+
+// ── Comparison Table ──────────────────────────────────────────────────
+function renderTable(a, b, bEnabled) {
+  const as  = a.summary;
+  const bs  = bEnabled && b ? b.summary : null;
+
+  const rows = [
+    ['Metric', 'Scenario A', 'Scenario B', 'Difference (A − B)'],
+    ['Service Level — Mean (%)',
+      pct(as.service_level?.mean),
+      bs ? pct(bs.service_level?.mean) : '—',
+      bs ? signPct(diff(as.service_level?.mean, bs.service_level?.mean)) : '—'],
+    ['Service Level — Std Dev (%)',
+      pct(as.service_level?.std),
+      bs ? pct(bs.service_level?.std) : '—', '—'],
+    ['Late Cars — Mean',
+      fmt1(as.late_count?.mean),
+      bs ? fmt1(bs.late_count?.mean) : '—',
+      bs ? sign(diff(as.late_count?.mean, bs.late_count?.mean)?.toFixed(1)) : '—'],
+    ['Avg Earliness — Mean (min)',
+      fmt1(as.avg_earliness?.mean),
+      bs ? fmt1(bs.avg_earliness?.mean) : '—',
+      bs ? sign(diff(as.avg_earliness?.mean, bs.avg_earliness?.mean)?.toFixed(1)) + ' min' : '—'],
+    ['Min Earliness — Mean (min)',
+      fmt1(as.min_earliness?.mean),
+      bs ? fmt1(bs.min_earliness?.mean) : '—', '—'],
+    ['Zone: Reception Peak (avg)',
+      fmt1(as.reception_peak?.mean) + ' / 14',
+      bs ? fmt1(bs.reception_peak?.mean) + ' / 14' : '—', '—'],
+    ['Zone: Gull Peak (avg)',
+      fmt1(as.gull_peak?.mean) + ' / 50',
+      bs ? fmt1(bs.gull_peak?.mean) + ' / 50' : '—', '—'],
+    ['Zone: P3 Peak (avg)',
+      fmt1(as.p3_peak?.mean) + ' / 150',
+      bs ? fmt1(bs.p3_peak?.mean) + ' / 150' : '—', '—'],
+    ['Zone: Return Peak (avg)',
+      fmt1(as.return_peak?.mean) + ' / 20',
+      bs ? fmt1(bs.return_peak?.mean) + ' / 20' : '—', '—'],
+  ];
+
+  document.getElementById('csvTableBody').innerHTML = rows.slice(1).map((r, i) => {
+    const diffVal = parseFloat(r[3]);
+    const isGoodPos = [0, 3].includes(i); // SL + earliness: positive = A better
+    const isGoodNeg = [2].includes(i);     // late: negative = A better
+    let cls = '';
+    if (!isNaN(diffVal)) {
+      if (isGoodPos && diffVal > 0)  cls = 'text-success fw-600';
+      if (isGoodPos && diffVal < 0)  cls = 'text-danger fw-600';
+      if (isGoodNeg && diffVal < 0)  cls = 'text-success fw-600';
+      if (isGoodNeg && diffVal > 0)  cls = 'text-danger fw-600';
+    }
+    return `<tr>
+      <td class="fw-500">${r[0]}</td>
+      <td class="text-primary fw-600">${r[1]}</td>
+      <td class="text-muted">${r[2]}</td>
+      <td class="${cls}">${r[3]}</td>
+    </tr>`;
+  }).join('');
+
+  // CSV download
+  const csvStr = rows.map(r =>
+    r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')
+  ).join('\n');
+  document.getElementById('csvDownloadBtn').onclick = () => {
+    const blob = new Blob([csvStr], {type:'text/csv'});
+    const url  = URL.createObjectURL(blob);
+    const el   = Object.assign(document.createElement('a'),
+                   {href:url, download:'isavia_scenario_comparison.csv'});
+    el.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────
+function set(id, v)       { const el=document.getElementById(id); if(el) el.textContent=v; }
+function fmt1(v)          { return v==null ? '—' : parseFloat(v).toFixed(1); }
+function pct(v)           { return v==null ? '—' : (v*100).toFixed(1)+'%'; }
+function diff(a,b)        { return (a==null||b==null) ? null : a-b; }
+function sign(v)          { const n=parseFloat(v); return n>0?'+'+v:''+v; }
+function signPct(v)       { return v==null ? '—' : (v>0?'+':'')+( v*100).toFixed(1)+'%'; }
+function toggleRaw()      { const el=document.getElementById('rawOutput'); el.style.display=el.style.display==='none'?'block':'none'; }
 
 function showToast(msg, type) {
-    const el = document.createElement('div');
-    el.className = `alert alert-${type} alert-dismissible fade show`;
-    el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px;font-size:0.84rem;';
-    el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+  const el = document.createElement('div');
+  el.className = `alert alert-${type} alert-dismissible fade show`;
+  el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:300px;font-size:0.84rem;box-shadow:var(--shadow-lg);';
+  el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
 }
 </script>
+
+<style>
+/* ── Workflow steps ── */
+.sim-workflow-steps { font-size:0.78rem; }
+.sim-step { display:flex;align-items:center;gap:0.4rem;color:var(--text-muted);font-weight:500;transition:color .2s; }
+.sim-step.active { color:var(--accent); }
+.sim-step-num { display:inline-flex;align-items:center;justify-content:center;width:1.4rem;height:1.4rem;border-radius:50%;background:var(--border);color:var(--text-muted);font-size:0.7rem;font-weight:700;transition:background .2s,color .2s; }
+.sim-step.active .sim-step-num { background:var(--accent);color:#fff; }
+.sim-step-arrow { color:var(--border);font-size:1rem; }
+
+/* ── Scenario cards ── */
+.scenario-header-a { background:linear-gradient(135deg,#1e40af,#2563eb)!important;color:#fff!important;border-bottom:none!important;padding:1rem 1.25rem; }
+.scenario-header-b { background:linear-gradient(135deg,#9f1239,#dc2626)!important;color:#fff!important;border-bottom:none!important;padding:1rem 1.25rem; }
+.scenario-badge-a,.scenario-badge-b { width:2.2rem;height:2.2rem;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0; }
+
+/* Param groups */
+.sim-param-group-label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.5rem;padding-bottom:.35rem;border-bottom:1px solid var(--border); }
+
+/* Placeholder */
+.sim-placeholder-card { background:var(--surface);border:2px dashed var(--border);border-radius:var(--radius-lg);min-height:200px;display:flex;align-items:center;justify-content:center; }
+.sim-placeholder-icon { width:4rem;height:4rem;border-radius:50%;background:var(--surface-alt);color:var(--border);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto; }
+
+/* Run banner */
+.sim-run-banner { background:var(--green-soft);border:1px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:.65rem 1rem;font-size:.82rem;font-weight:500;color:var(--green); }
+
+/* Comparison cards */
+.comparison-header-a { background:linear-gradient(135deg,#1e40af,#2563eb)!important;color:#fff!important;border-bottom:none!important;padding:1rem 1.25rem; }
+.comparison-header-b { background:linear-gradient(135deg,#9f1239,#dc2626)!important;color:#fff!important;border-bottom:none!important;padding:1rem 1.25rem; }
+.comparison-badge-a,.comparison-badge-b { width:2.2rem;height:2.2rem;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0; }
+.kpi-grid { display:grid;grid-template-columns:1fr 1fr;gap:.75rem; }
+.kpi-item { background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;text-align:center; }
+.kpi-value { font-size:1.4rem;font-weight:700;color:var(--text);line-height:1;margin-bottom:.25rem; }
+.kpi-label { font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted); }
+.kpi-primary .kpi-value { color:var(--accent); }
+
+/* Delta */
+.delta-card { border-left:3px solid var(--green)!important;background:var(--green-soft)!important; }
+.delta-title { font-size:.85rem;font-weight:600;color:var(--green); }
+.delta-item { display:flex;flex-direction:column;align-items:center;gap:.1rem; }
+.delta-label { font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted); }
+.delta-value { font-size:1.1rem;font-weight:700; }
+.delta-divider { width:1px;height:2rem;background:rgba(22,163,74,.2);align-self:center; }
+
+/* Zone peaks */
+.zone-peak-grid { display:grid;grid-template-columns:1fr 1fr;gap:1rem; }
+.zone-peak-item { background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem; }
+.zone-peak-name { font-size:.82rem;font-weight:600;margin-bottom:.1rem; }
+.zone-peak-cap  { font-size:.72rem;margin-bottom:.6rem; }
+.zone-peak-bars { display:flex;flex-direction:column;gap:.35rem; }
+.zone-peak-bar-row { display:flex;align-items:center;gap:.5rem; }
+.zone-peak-bar-label { font-size:.7rem;font-weight:500;width:4.5rem;flex-shrink:0; }
+.zone-peak-bar-track { flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden; }
+.zone-peak-bar-fill  { height:100%;border-radius:4px;transition:width .6s ease; }
+.zone-peak-bar-val   { font-size:.75rem;font-weight:600;min-width:1.8rem;text-align:right; }
+
+/* Table */
+.comparison-table th { background:var(--surface-alt)!important;font-size:.75rem;padding:.65rem 1rem; }
+.comparison-table td { font-size:.82rem;padding:.6rem 1rem;vertical-align:middle; }
+.comparison-table td.fw-500 { color:var(--text);font-weight:500; }
+
+/* Misc */
+.--red { color:var(--red); }
+.text-primary { color:var(--accent)!important; }
+
+@media(max-width:576px){
+  .zone-peak-grid{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:1fr 1fr;}
+  .sim-workflow-steps{display:none!important;}
+}
+</style>
 {% endblock %}
