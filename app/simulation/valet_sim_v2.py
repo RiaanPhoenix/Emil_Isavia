@@ -25,9 +25,10 @@ from typing import Optional, List, Dict
 # API
 # =============================================================================
 
-API_URL      = "https://parking-api-dev-d8b2ejb0asc0gbec.northeurope-01.azurewebsites.net"
-API_USER     = "parking"
-API_PASSWORD = "***REDACTED***"
+import os
+API_URL      = os.getenv("PARKING_API_URL", "https://parking-api-dev-d8b2ejb0asc0gbec.northeurope-01.azurewebsites.net")
+API_USER     = os.getenv("PARKING_API_USERNAME", "")
+API_PASSWORD = os.getenv("PARKING_API_PASSWORD", "")
 
 # =============================================================================
 # PHYSICAL CONSTANTS
