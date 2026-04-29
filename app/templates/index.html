@@ -2,547 +2,507 @@
 
 {% block title %}Emil Isavia — Valet Operations{% endblock %}
 
+{% block head %}
+<style>
+  .badge-move1 { background: #0d6efd; }
+  .badge-move2 { background: #198754; }
+  .worker-w1 { color: #0d6efd; font-weight: 600; }
+  .worker-w2 { color: #6f42c1; font-weight: 600; }
+
+  .timeline-wrap { overflow-x: auto; padding-bottom: 4px; }
+  #timeline-canvas { display: block; min-width: 600px; }
+
+  .warning-badge {
+    background: rgba(255,193,7,.12);
+    border-left: 3px solid #ffc107;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: .82rem;
+    margin-bottom: 4px;
+  }
+  .summary-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 20px; padding: 3px 10px;
+    font-size: .82rem; margin: 2px;
+  }
+  .summary-pill span { font-weight: 600; }
+
+  #plan-status { min-height: 28px; font-size: .87rem; }
+
+  .task-row:hover { background: rgba(13,110,253,.06); }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <!-- Page Header -->
 <div class="row mb-4">
-    <div class="col-12 d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="mb-1">Valet Operations</h1>
-            <p class="text-muted mb-0">Keflavík Airport · Premium Valet Optimizer</p>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="status-pill" id="apiPill">
-                <span class="status-dot" id="apiDot"></span>
-                <span id="apiLabel">Checking...</span>
-            </span>
-            <button class="btn btn-outline-secondary btn-sm" onclick="refreshAll()">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
-        </div>
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="mb-1">Valet Operations</h1>
+      <p class="text-muted mb-0">Keflavík Airport · Premium Valet Optimizer</p>
     </div>
+    <div class="d-flex align-items-center gap-3">
+      <span class="status-pill" id="apiPill">
+        <span class="status-dot" id="apiDot"></span>
+        <span id="apiLabel">Checking...</span>
+      </span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshStatus()">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- Main Two-Column Layout -->
 <div class="row">
 
-    <!-- LEFT: Optimization Panel (primary) -->
-    <div class="col-lg-7">
+  <!-- LEFT: Day Plan (primary) -->
+  <div class="col-lg-7">
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span><i class="fas fa-calendar-alt"></i> Day Plan</span>
+        <div class="d-flex align-items-center gap-2">
+          <input type="date" id="planDate" class="form-control form-control-sm" style="width:155px;">
+          <button class="btn btn-primary btn-sm" id="btnGenerate" onclick="generatePlan()">
+            <i class="fas fa-play"></i> Generate Plan
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" id="btnCsv" onclick="exportCsv()" disabled>
+            <i class="fas fa-download"></i> CSV
+          </button>
+        </div>
+      </div>
 
-        <!-- Booking Controls -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-calendar-alt"></i> Booking Input
-            </div>
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-sm-5">
-                        <label class="form-label">Date</label>
-                        <input type="date" class="form-control" id="bookingDate">
-                    </div>
-                    <div class="col-sm-4">
-                        <label class="form-label">Source</label>
-                        <select class="form-control" id="dataSource" onchange="toggleCustomerCount()">
-                            <option value="real">Real Parking API</option>
-                            <option value="mock">Mock Data</option>
-                        </select>
-                    </div>
-                    <div class="col-sm-3" id="numCustomersField" style="display:none;">
-                        <label class="form-label">Customers</label>
-                        <input type="number" class="form-control" id="numCustomers" value="60" min="1" max="200">
-                    </div>
-                    <div class="col-12">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="generateBookings()" id="generateBtn">
-                            <i class="fas fa-download"></i> Load Bookings
-                        </button>
-                        <span class="ms-3 text-muted small" id="bookingsMeta" style="display:none;">
-                            <i class="fas fa-check-circle text-success"></i>
-                            <span id="bookingsCount">0</span> bookings loaded ·
-                            <button class="btn btn-link btn-sm p-0" onclick="previewBookings()">Preview</button>
-                        </span>
-                    </div>
-                </div>
-            </div>
+      <div class="card-body">
+
+        <!-- Status -->
+        <div id="planStatus" class="text-muted mb-2"></div>
+
+        <!-- Summary pills -->
+        <div id="planSummary" style="display:none;" class="mb-3"></div>
+
+        <!-- Warnings -->
+        <div id="planWarnings" style="display:none;" class="mb-3"></div>
+
+        <!-- Gantt timeline -->
+        <div class="timeline-wrap mb-3" id="timelineWrap" style="display:none;">
+          <canvas id="timeline-canvas" height="90"></canvas>
         </div>
 
-        <!-- Optimization — Primary Feature -->
-        <div class="card mb-4 optimize-card">
-            <div class="card-header optimize-header">
-                <i class="fas fa-cogs"></i> Optimization
-                <span class="ms-2 badge optimizer-badge" id="optimizerBadge">Heuristic</span>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Compute the minimum-cost staff schedule and car movement plan for the day.
-                    Run this as often as needed — each run produces a fresh plan.
-                </p>
-
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <button class="btn btn-optimize" onclick="runOptimization()" id="optimizeBtn">
-                        <i class="fas fa-play"></i> Run Optimizer
-                    </button>
-                    <span class="text-muted small" id="optimizeRequires" style="display:none;">
-                        Load bookings first
-                    </span>
-                </div>
-
-                <!-- Results (hidden until run) -->
-                <div id="optimizationResult" style="display:none;">
-                    <div class="result-row">
-                        <div class="result-stat">
-                            <span class="result-value" id="staffHours">—</span>
-                            <span class="result-label">Staff-hours</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value" id="carMoves">—</span>
-                            <span class="result-label">Car moves</span>
-                        </div>
-                        <div class="result-divider"></div>
-                        <div class="result-stat">
-                            <span class="result-value text-success" id="optimizeStatus">—</span>
-                            <span class="result-label">Status</span>
-                        </div>
-                        <div class="ms-auto">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="showOptimizationDetails()">
-                                <i class="fas fa-table"></i> Details
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Staff Schedule Table -->
-                    <div id="scheduleTableWrap" class="mt-3" style="display:none;">
-                        <h6 class="text-muted small mb-2 text-uppercase ls-1">Staff Schedule</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm schedule-table">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Move</th>
-                                        <th>From</th>
-                                        <th>To</th>
-                                        <th>Car</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="scheduleTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="optimizePlaceholder" class="text-center text-muted py-4 small">
-                    <i class="fas fa-cogs fa-2x mb-2 d-block" style="opacity:0.2;"></i>
-                    Load bookings, then run the optimizer
-                </div>
-            </div>
+        <!-- Task table -->
+        <div class="table-responsive" id="planTableWrap" style="display:none;">
+          <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>Type</th>
+                <th>Car ID</th>
+                <th>Worker</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Min</th>
+                <th>Move</th>
+                <th>Return Deadline</th>
+              </tr>
+            </thead>
+            <tbody id="planTbody"></tbody>
+          </table>
         </div>
 
-        <!-- Quick Stats Bar -->
-        <div class="row g-3 mb-4">
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="statBookings">—</div>
-                    <div class="stat-label">Bookings</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="statHours">—</div>
-                    <div class="stat-label">Staff-hours</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="stat-card">
-                    <div class="stat-value" id="statMoves">—</div>
-                    <div class="stat-label">Car moves</div>
-                </div>
-            </div>
+        <!-- Empty / placeholder -->
+        <div id="planPlaceholder" class="text-center text-muted py-5 small">
+          <i class="fas fa-calendar-alt fa-2x mb-2 d-block" style="opacity:.2;"></i>
+          Choose a date and click Generate Plan
         </div>
 
+      </div>
     </div>
 
-    <!-- RIGHT: Live Feed -->
-    <div class="col-lg-5">
-
-        <!-- Live Occupancy -->
-        <div class="card mb-4">
-            <div class="card-header live-card-header">
-                <span>
-                    <span class="live-dot"></span>
-                    Live Occupancy
-                </span>
-                <small id="liveTimestamp" class="text-muted-light">Loading…</small>
-            </div>
-            <div class="card-body p-0">
-
-                <div class="zone-row zone-reception" id="zoneReception">
-                    <div class="zone-info">
-                        <span class="zone-name">Reception</span>
-                        <span class="zone-cap">/ 14</span>
-                    </div>
-                    <div class="zone-bar-wrap">
-                        <div class="zone-bar">
-                            <div class="zone-fill zone-fill-blue" id="fillReception" style="width:0%"></div>
-                        </div>
-                    </div>
-                    <span class="zone-count" id="countReception">—</span>
-                </div>
-
-                <div class="zone-row zone-gull" id="zoneGull">
-                    <div class="zone-info">
-                        <span class="zone-name">Gull Storage</span>
-                        <span class="zone-cap">/ 50</span>
-                    </div>
-                    <div class="zone-bar-wrap">
-                        <div class="zone-bar">
-                            <div class="zone-fill zone-fill-amber" id="fillGull" style="width:0%"></div>
-                        </div>
-                    </div>
-                    <span class="zone-count" id="countGull">—</span>
-                </div>
-
-                <div class="zone-row zone-p3" id="zoneP3">
-                    <div class="zone-info">
-                        <span class="zone-name">P3 Storage</span>
-                        <span class="zone-cap">/ 150</span>
-                    </div>
-                    <div class="zone-bar-wrap">
-                        <div class="zone-bar">
-                            <div class="zone-fill zone-fill-slate" id="fillP3" style="width:0%"></div>
-                        </div>
-                    </div>
-                    <span class="zone-count" id="countP3">—</span>
-                </div>
-
-                <div class="zone-row zone-delivery" id="zoneDelivery">
-                    <div class="zone-info">
-                        <span class="zone-name">Delivery</span>
-                        <span class="zone-cap">/ 20</span>
-                    </div>
-                    <div class="zone-bar-wrap">
-                        <div class="zone-bar">
-                            <div class="zone-fill zone-fill-green" id="fillDelivery" style="width:0%"></div>
-                        </div>
-                    </div>
-                    <span class="zone-count" id="countDelivery">—</span>
-                </div>
-
-                <div class="px-3 pb-3 pt-1">
-                    <a href="/live-feed" class="btn btn-sm btn-outline-secondary w-100">
-                        <i class="fas fa-external-link-alt"></i> Full Live Feed
-                    </a>
-                </div>
-            </div>
+    <!-- Quick Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-value" id="statCars">—</div>
+          <div class="stat-label">Bookings</div>
         </div>
-
-        <!-- Zone Layout Reference -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <i class="fas fa-map-marked-alt"></i> Zone Layout
-            </div>
-            <div class="card-body">
-                <div class="zone-diagram">
-                    <div class="zone-box reception mb-2">
-                        <strong>Reception</strong>
-                        <small>14 spots · Customer drop-off</small>
-                    </div>
-                    <div class="zone-arrows mb-2">
-                        <span class="zone-arrow-label">3 min →</span>
-                        <span class="zone-arrow-label ms-4">8 min →</span>
-                    </div>
-                    <div class="d-flex gap-2 mb-2">
-                        <div class="zone-box gull flex-1">
-                            <strong>Gull</strong>
-                            <small>50 spots · 4 min to delivery</small>
-                        </div>
-                        <div class="zone-box p3 flex-1">
-                            <strong>P3</strong>
-                            <small>150 spots · 9 min to delivery</small>
-                        </div>
-                    </div>
-                    <div class="zone-box delivery">
-                        <strong>Delivery</strong>
-                        <small>20 spots · ≥15 min lead time</small>
-                    </div>
-                </div>
-            </div>
+      </div>
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-value" id="statWorkH">—</div>
+          <div class="stat-label">Work-hours</div>
         </div>
-
-        <!-- Evaluation Link -->
-        <div class="card eval-card">
-            <div class="card-body d-flex align-items-center gap-3">
-                <i class="fas fa-flask eval-icon"></i>
-                <div>
-                    <div class="fw-600 small">Simulation & Evaluation</div>
-                    <div class="text-muted small">Compare optimizer vs baseline · stress-test under uncertainty</div>
-                </div>
-                <a href="/simulate" class="btn btn-sm btn-outline-secondary ms-auto text-nowrap">
-                    Open <i class="fas fa-arrow-right ms-1"></i>
-                </a>
-            </div>
+      </div>
+      <div class="col-4">
+        <div class="stat-card">
+          <div class="stat-value" id="statMoves">—</div>
+          <div class="stat-label">Car moves</div>
         </div>
-
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Bookings Preview Modal -->
-<div class="modal fade" id="bookingsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Valet Bookings Preview</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Booking ID</th>
-                                <th>Car Plate</th>
-                                <th>Drop-off</th>
-                                <th>Return</th>
-                                <th>Duration</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bookingsTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
+  <!-- RIGHT: Live Feed + Zone Layout -->
+  <div class="col-lg-5">
+
+    <!-- Live Occupancy -->
+    <div class="card mb-4">
+      <div class="card-header live-card-header">
+        <span><span class="live-dot"></span> Live Occupancy</span>
+        <small id="liveTimestamp" class="text-muted-light">Loading…</small>
+      </div>
+      <div class="card-body p-0">
+        <div class="zone-row zone-reception">
+          <div class="zone-info"><span class="zone-name">Reception</span><span class="zone-cap">/ 14</span></div>
+          <div class="zone-bar-wrap"><div class="zone-bar"><div class="zone-fill zone-fill-blue" id="fillReception" style="width:0%"></div></div></div>
+          <span class="zone-count" id="countReception">—</span>
         </div>
+        <div class="zone-row zone-gull">
+          <div class="zone-info"><span class="zone-name">Gull Storage</span><span class="zone-cap">/ 50</span></div>
+          <div class="zone-bar-wrap"><div class="zone-bar"><div class="zone-fill zone-fill-amber" id="fillGull" style="width:0%"></div></div></div>
+          <span class="zone-count" id="countGull">—</span>
+        </div>
+        <div class="zone-row zone-p3">
+          <div class="zone-info"><span class="zone-name">P3 Storage</span><span class="zone-cap">/ 150</span></div>
+          <div class="zone-bar-wrap"><div class="zone-bar"><div class="zone-fill zone-fill-slate" id="fillP3" style="width:0%"></div></div></div>
+          <span class="zone-count" id="countP3">—</span>
+        </div>
+        <div class="zone-row zone-delivery">
+          <div class="zone-info"><span class="zone-name">Delivery</span><span class="zone-cap">/ 20</span></div>
+          <div class="zone-bar-wrap"><div class="zone-bar"><div class="zone-fill zone-fill-green" id="fillDelivery" style="width:0%"></div></div></div>
+          <span class="zone-count" id="countDelivery">—</span>
+        </div>
+        <div class="px-3 pb-3 pt-1">
+          <a href="/live-feed" class="btn btn-sm btn-outline-secondary w-100">
+            <i class="fas fa-external-link-alt"></i> Full Live Feed
+          </a>
+        </div>
+      </div>
     </div>
+
+    <!-- Zone Layout Reference -->
+    <div class="card mb-4">
+      <div class="card-header"><i class="fas fa-map-marked-alt"></i> Zone Layout</div>
+      <div class="card-body">
+        <div class="zone-diagram">
+          <div class="zone-box reception mb-2">
+            <strong>Reception</strong><small>14 spots · Customer drop-off</small>
+          </div>
+          <div class="zone-arrows mb-2">
+            <span class="zone-arrow-label">3 min →</span>
+            <span class="zone-arrow-label ms-4">8 min →</span>
+          </div>
+          <div class="d-flex gap-2 mb-2">
+            <div class="zone-box gull flex-1"><strong>Gull</strong><small>50 spots · 4 min to delivery</small></div>
+            <div class="zone-box p3 flex-1"><strong>P3</strong><small>150 spots · 9 min to delivery</small></div>
+          </div>
+          <div class="zone-box delivery"><strong>Delivery</strong><small>20 spots · ≥15 min lead time</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation link -->
+    <div class="card eval-card">
+      <div class="card-body d-flex align-items-center gap-3">
+        <i class="fas fa-flask eval-icon"></i>
+        <div>
+          <div class="fw-600 small">Simulation &amp; Evaluation</div>
+          <div class="text-muted small">Compare optimizer vs baseline · stress-test under uncertainty</div>
+        </div>
+        <a href="/simulate" class="btn btn-sm btn-outline-secondary ms-auto text-nowrap">
+          Open <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-let currentBookings = null;
-let currentOptimization = null;
+let planData = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('bookingDate').value = new Date().toISOString().split('T')[0];
-    toggleCustomerCount();
-    refreshAll();
-    loadLiveFeed();
-    setInterval(loadLiveFeed, 30000);
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('planDate').value = new Date().toISOString().slice(0, 10);
+  refreshStatus();
+  loadLiveFeed();
+  setInterval(loadLiveFeed, 30000);
+
+  // Polyfill roundRect for older browsers
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.min(r, w / 2, h / 2);
+      this.moveTo(x + r, y);
+      this.arcTo(x + w, y, x + w, y + h, r);
+      this.arcTo(x + w, y + h, x, y + h, r);
+      this.arcTo(x, y + h, x, y, r);
+      this.arcTo(x, y, x + w, y, r);
+      this.closePath();
+    };
+  }
 });
 
-function toggleCustomerCount() {
-    const src = document.getElementById('dataSource').value;
-    document.getElementById('numCustomersField').style.display = src === 'mock' ? 'block' : 'none';
+/* ── Generate Plan ───────────────────────────────────────────── */
+function generatePlan() {
+  const date = document.getElementById('planDate').value;
+  if (!date) { showToast('Please select a date', 'warning'); return; }
+
+  const btn = document.getElementById('btnGenerate');
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading…';
+  btn.disabled = true;
+  document.getElementById('btnCsv').disabled = true;
+  document.getElementById('planSummary').style.display  = 'none';
+  document.getElementById('planWarnings').style.display = 'none';
+  document.getElementById('planTableWrap').style.display = 'none';
+  document.getElementById('timelineWrap').style.display  = 'none';
+  document.getElementById('planPlaceholder').style.display = 'none';
+  setStatus('<i class="fas fa-spinner fa-spin"></i> Fetching bookings and scheduling…', 'text-muted');
+  planData = null;
+
+  fetch('/api/greedy-schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { setStatus('Error: ' + data.error, 'text-danger'); return; }
+    planData = data;
+    renderPlan(data);
+  })
+  .catch(err => setStatus('Request failed: ' + err, 'text-danger'))
+  .finally(() => {
+    btn.innerHTML = '<i class="fas fa-play"></i> Generate Plan';
+    btn.disabled = false;
+  });
 }
 
-function refreshAll() {
-    fetch('/api/status')
-        .then(r => r.json())
-        .then(data => {
-            const c = data.components || {};
-            const apiOk = c.premium_parking_api === 'connected' || c.premium_parking_api === 'premium_api_available';
-            const optMode = c.optimization;
+function setStatus(html, cls) {
+  const el = document.getElementById('planStatus');
+  el.innerHTML = html;
+  el.className = (cls || 'text-muted') + ' mb-2';
+}
 
-            const dot = document.getElementById('apiDot');
-            const label = document.getElementById('apiLabel');
-            if (apiOk) {
-                dot.className = 'status-dot dot-green';
-                label.textContent = 'API Connected';
-            } else if (c.premium_parking_api === 'error') {
-                dot.className = 'status-dot dot-red';
-                label.textContent = 'API Error';
-            } else {
-                dot.className = 'status-dot dot-amber';
-                label.textContent = 'API Offline';
-            }
+function renderPlan(data) {
+  const tasks    = data.tasks    || [];
+  const warnings = data.warnings || [];
+  const summary  = data.summary  || {};
+  const storage  = data.storage  || '—';
 
-            const badge = document.getElementById('optimizerBadge');
-            if (optMode === 'gurobi_available') {
-                badge.textContent = 'Gurobi';
-                badge.className = 'ms-2 badge optimizer-badge-gurobi';
-            } else {
-                badge.textContent = 'Heuristic';
-                badge.className = 'ms-2 badge optimizer-badge';
-            }
-        })
-        .catch(() => {
-            document.getElementById('apiDot').className = 'status-dot dot-red';
-            document.getElementById('apiLabel').textContent = 'Offline';
-        });
+  const srcBadge = data.source === 'api'
+    ? '<span class="badge bg-success">Live API</span>'
+    : '<span class="badge bg-warning text-dark">No API data</span>';
+  setStatus(
+    `Plan for <strong>${data.date}</strong> &nbsp;${srcBadge}&nbsp; Storage: <strong>${storage}</strong>`,
+    'text-muted'
+  );
+
+  // Summary pills
+  document.getElementById('planSummary').innerHTML = [
+    pill('fas fa-car',       summary.total_cars    + ' bookings'),
+    pill('fas fa-users',     summary.num_workers   + ' workers'),
+    pill('fas fa-clock',     summary.total_work_min + ' min'),
+    pill('fas fa-hourglass', summary.total_work_h  + ' h'),
+    pill('fas fa-warehouse', summary.n_gull + ' → Gull'),
+    pill('fas fa-warehouse', summary.n_p3   + ' → P3'),
+  ].join('');
+  document.getElementById('planSummary').style.display = 'block';
+
+  // Quick stats bar
+  document.getElementById('statCars').textContent   = summary.total_cars   ?? '—';
+  document.getElementById('statWorkH').textContent  = summary.total_work_h ?? '—';
+  document.getElementById('statMoves').textContent  = tasks.length;
+
+  // Warnings
+  if (warnings.length) {
+    document.getElementById('planWarnings').innerHTML = warnings.map(w =>
+      `<div class="warning-badge"><i class="fas fa-exclamation-triangle text-warning me-1"></i>${esc(w)}</div>`
+    ).join('');
+    document.getElementById('planWarnings').style.display = 'block';
+  }
+
+  if (tasks.length === 0) {
+    document.getElementById('planPlaceholder').innerHTML =
+      '<i class="fas fa-calendar-times fa-2x mb-2 d-block" style="opacity:.2;"></i>No bookings found for this date.';
+    document.getElementById('planPlaceholder').style.display = 'block';
+    return;
+  }
+
+  // Table
+  document.getElementById('planTbody').innerHTML = tasks.map(r => {
+    const tc = r.type === 'MOVE1' ? 'badge-move1' : 'badge-move2';
+    const wc = r.worker === 'W1'  ? 'worker-w1'   : 'worker-w2';
+    return `<tr class="task-row">
+      <td><span class="badge ${tc}">${esc(r.type)}</span></td>
+      <td>${esc(r.carId)}</td>
+      <td class="${wc}">${esc(r.worker)}</td>
+      <td>${esc(r.start)}</td>
+      <td>${esc(r.end)}</td>
+      <td>${r.durationMin}</td>
+      <td><small>${esc(r.move)}</small></td>
+      <td><small class="text-info">${esc(r.returnDeadline)}</small></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('planTableWrap').style.display = 'block';
+
+  // Timeline
+  drawTimeline(tasks);
+  document.getElementById('timelineWrap').style.display = 'block';
+
+  document.getElementById('btnCsv').disabled = false;
+  showToast(`Plan ready — ${tasks.length} moves scheduled`, 'success');
+}
+
+/* ── Timeline (Gantt) ────────────────────────────────────────── */
+function drawTimeline(tasks) {
+  const canvas = document.getElementById('timeline-canvas');
+  const dpr    = window.devicePixelRatio || 1;
+  const W      = canvas.parentElement.clientWidth || 600;
+  const ROW_H  = 28;
+  const LABEL  = 90;
+  const PAD_T  = 22;
+  const PAD_B  = 6;
+
+  const workers = [...new Set(tasks.map(t => t.worker))].sort();
+  const H = PAD_T + workers.length * ROW_H + PAD_B;
+
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = '#1a1f2e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Hour grid lines + labels
+  ctx.strokeStyle = 'rgba(255,255,255,.08)';
+  ctx.fillStyle   = 'rgba(255,255,255,.38)';
+  ctx.font        = '9px Inter, sans-serif';
+  ctx.textAlign   = 'center';
+  for (let h = 0; h <= 24; h += 2) {
+    const x = LABEL + (h / 24) * (W - LABEL);
+    ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, H - PAD_B); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.38)';
+    ctx.fillText(String(h).padStart(2, '0') + ':00', x, PAD_T - 4);
+  }
+
+  workers.forEach((wkr, i) => {
+    const y0 = PAD_T + i * ROW_H;
+    ctx.fillStyle = wkr === 'W1' ? '#0d6efd' : '#6f42c1';
+    ctx.font      = '10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(wkr, 4, y0 + ROW_H / 2 + 4);
+
+    tasks.filter(t => t.worker === wkr).forEach(t => {
+      const [sh, sm] = t.start.slice(11).split(':').map(Number);
+      const [eh, em] = t.end.slice(11).split(':').map(Number);
+      const x1   = LABEL + ((sh * 60 + sm) / 1440) * (W - LABEL);
+      const x2   = LABEL + ((eh * 60 + em) / 1440) * (W - LABEL);
+      const barW = Math.max(x2 - x1, 4);
+      const barH = ROW_H - 6;
+      const by   = y0 + 3;
+
+      ctx.fillStyle = t.type === 'MOVE1' ? '#0d6efd' : '#198754';
+      ctx.beginPath();
+      ctx.roundRect(x1, by, barW, barH, 3);
+      ctx.fill();
+
+      if (barW > 28) {
+        ctx.fillStyle = '#fff';
+        ctx.font      = '8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.carId, x1 + barW / 2, by + barH / 2 + 3);
+      }
+    });
+  });
+}
+
+/* ── CSV Export ──────────────────────────────────────────────── */
+function exportCsv() {
+  if (!planData || !planData.tasks.length) return;
+  const cols = ['type','carId','storage','worker','start','end','durationMin','move',
+                'depFlight','arrFlight','storageDeadline','returnDeadline'];
+  const lines = [cols.join(',')];
+  planData.tasks.forEach(r => {
+    lines.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = `day_plan_${planData.date}.csv`;
+  a.click();
+}
+
+/* ── Status / Live Feed ──────────────────────────────────────── */
+function refreshStatus() {
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+      const c = data.components || {};
+      const apiOk = c.premium_parking_api === 'connected' || c.premium_parking_api === 'premium_api_available';
+      const dot   = document.getElementById('apiDot');
+      const label = document.getElementById('apiLabel');
+      if (apiOk) {
+        dot.className = 'status-dot dot-green'; label.textContent = 'API Connected';
+      } else if (c.premium_parking_api === 'error') {
+        dot.className = 'status-dot dot-red'; label.textContent = 'API Error';
+      } else {
+        dot.className = 'status-dot dot-amber'; label.textContent = 'API Offline';
+      }
+    })
+    .catch(() => {
+      document.getElementById('apiDot').className = 'status-dot dot-red';
+      document.getElementById('apiLabel').textContent = 'Offline';
+    });
 }
 
 function loadLiveFeed() {
-    fetch('/api/live-status')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) throw new Error('feed error');
-            const { occupancy, capacities } = data;
-
-            setZone('Reception', occupancy.reception, capacities.reception, 'fillReception', 'countReception', 'zone-fill-blue');
-            setZone('Gull',      occupancy.gull,      capacities.gull,      'fillGull',      'countGull',      'zone-fill-amber');
-            setZone('P3',        occupancy.p3,         capacities.p3,        'fillP3',         'countP3',        'zone-fill-slate');
-            setZone('Delivery',  occupancy.delivery,   capacities.delivery,  'fillDelivery',  'countDelivery',  'zone-fill-green');
-
-            const ts = new Date(data.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-            document.getElementById('liveTimestamp').textContent = 'Updated ' + ts;
-        })
-        .catch(() => {
-            ['countReception','countGull','countP3','countDelivery'].forEach(id => {
-                document.getElementById(id).textContent = '—';
-            });
-            document.getElementById('liveTimestamp').textContent = 'Offline';
-        });
-}
-
-function setZone(name, count, cap, fillId, countId, colorClass) {
-    const pct = cap > 0 ? Math.min(100, (count / cap) * 100) : 0;
-    const fill = document.getElementById(fillId);
-    fill.style.width = pct + '%';
-    fill.className = 'zone-fill ' + (pct >= 90 ? 'zone-fill-red' : colorClass);
-    document.getElementById(countId).textContent = count;
-}
-
-function generateBookings() {
-    const btn = document.getElementById('generateBtn');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading…';
-    btn.disabled = true;
-
-    const date = document.getElementById('bookingDate').value;
-    const src = document.getElementById('dataSource').value;
-    const customers = document.getElementById('numCustomers').value;
-    const useReal = src === 'real' ? 'true' : 'false';
-
-    fetch(`/api/bookings?date=${date}&customers=${customers}&use_real=${useReal}`)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) throw new Error(data.error || 'Unknown error');
-            currentBookings = data.data;
-            document.getElementById('bookingsCount').textContent = data.count;
-            document.getElementById('bookingsMeta').style.display = 'inline';
-            document.getElementById('statBookings').textContent = data.count;
-            document.getElementById('optimizePlaceholder').innerHTML =
-                '<i class="fas fa-cogs fa-2x mb-2 d-block" style="opacity:0.2;"></i>Bookings ready — click Run Optimizer';
-            showToast(`${data.count} bookings loaded`, 'success');
-        })
-        .catch(e => showToast('Failed to load bookings: ' + e.message, 'danger'))
-        .finally(() => {
-            btn.innerHTML = '<i class="fas fa-download"></i> Load Bookings';
-            btn.disabled = false;
-        });
-}
-
-function previewBookings() {
-    if (!currentBookings) return;
-    const tbody = document.getElementById('bookingsTableBody');
-    tbody.innerHTML = '';
-    currentBookings.slice(0, 20).forEach(b => {
-        tbody.innerHTML += `<tr>
-            <td>${b.booking_id}</td>
-            <td>${b.car_plate}</td>
-            <td>${fmt(b.departure_time)}</td>
-            <td>${fmt(b.arrival_time)}</td>
-            <td>${dur(b.departure_time, b.arrival_time)}</td>
-        </tr>`;
-    });
-    new bootstrap.Modal(document.getElementById('bookingsModal')).show();
-}
-
-function runOptimization() {
-    if (!currentBookings) {
-        showToast('Load bookings first', 'warning');
-        return;
-    }
-    const btn = document.getElementById('optimizeBtn');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Optimizing…';
-    btn.disabled = true;
-    document.getElementById('optimizePlaceholder').style.display = 'none';
-
-    fetch('/api/optimize', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-            bookings: currentBookings,
-            base_time: document.getElementById('bookingDate').value + 'T00:00:00'
-        })
-    })
+  fetch('/api/live-status')
     .then(r => r.json())
     .then(data => {
-        if (!data.success) throw new Error(data.error || 'Unknown error');
-        currentOptimization = data.optimization_result;
-        const res = currentOptimization;
-
-        document.getElementById('staffHours').textContent = res.total_staff_hours.toFixed(1);
-        document.getElementById('carMoves').textContent = res.car_movements.length;
-        document.getElementById('optimizeStatus').textContent = res.status;
-        document.getElementById('statHours').textContent = res.total_staff_hours.toFixed(1);
-        document.getElementById('statMoves').textContent = res.car_movements.length;
-
-        document.getElementById('optimizationResult').style.display = 'block';
-        document.getElementById('optimizePlaceholder').style.display = 'none';
-
-        // Populate schedule table
-        const tbody = document.getElementById('scheduleTableBody');
-        tbody.innerHTML = '';
-        const moves = res.car_movements || [];
-        if (moves.length > 0) {
-            moves.slice(0, 30).forEach(m => {
-                tbody.innerHTML += `<tr>
-                    <td>${fmtTime(m.time || m.start_time || '—')}</td>
-                    <td><span class="move-badge">Move</span></td>
-                    <td>${m.from_zone || '—'}</td>
-                    <td>${m.to_zone || '—'}</td>
-                    <td class="text-muted">${m.car_plate || m.booking_id || '—'}</td>
-                </tr>`;
-            });
-            document.getElementById('scheduleTableWrap').style.display = 'block';
-        }
-
-        showToast('Optimization complete · ' + res.status, 'success');
+      if (!data.success) throw new Error();
+      const { occupancy, capacities } = data;
+      setZone(occupancy.reception, capacities.reception, 'fillReception', 'countReception', 'zone-fill-blue');
+      setZone(occupancy.gull,      capacities.gull,      'fillGull',      'countGull',      'zone-fill-amber');
+      setZone(occupancy.p3,        capacities.p3,        'fillP3',        'countP3',        'zone-fill-slate');
+      setZone(occupancy.delivery,  capacities.delivery,  'fillDelivery',  'countDelivery',  'zone-fill-green');
+      const ts = new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('liveTimestamp').textContent = 'Updated ' + ts;
     })
-    .catch(e => {
-        document.getElementById('optimizePlaceholder').style.display = 'block';
-        showToast('Optimization failed: ' + e.message, 'danger');
-    })
-    .finally(() => {
-        btn.innerHTML = '<i class="fas fa-play"></i> Run Optimizer';
-        btn.disabled = false;
+    .catch(() => {
+      ['countReception','countGull','countP3','countDelivery'].forEach(id => {
+        document.getElementById(id).textContent = '—';
+      });
+      document.getElementById('liveTimestamp').textContent = 'Offline';
     });
 }
 
-function showOptimizationDetails() {
-    document.getElementById('scheduleTableWrap').style.display =
-        document.getElementById('scheduleTableWrap').style.display === 'none' ? 'block' : 'none';
+function setZone(count, cap, fillId, countId, colorClass) {
+  const pct  = cap > 0 ? Math.min(100, (count / cap) * 100) : 0;
+  const fill = document.getElementById(fillId);
+  fill.style.width = pct + '%';
+  fill.className   = 'zone-fill ' + (pct >= 90 ? 'zone-fill-red' : colorClass);
+  document.getElementById(countId).textContent = count;
 }
 
-function fmt(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+/* ── Helpers ─────────────────────────────────────────────────── */
+function pill(icon, text) {
+  return `<span class="summary-pill"><i class="${icon}"></i><span>${text}</span></span>`;
 }
-
-function fmtTime(iso) {
-    if (!iso || iso === '—') return '—';
-    try {
-        const d = new Date(iso);
-        return d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-    } catch { return iso; }
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-function dur(start, end) {
-    const h = Math.round((new Date(end) - new Date(start)) / 3600000);
-    if (h < 24) return h + 'h';
-    const d = Math.floor(h / 24);
-    return d + 'd ' + (h % 24) + 'h';
-}
-
 function showToast(msg, type) {
-    const el = document.createElement('div');
-    el.className = `alert alert-${type} alert-dismissible fade show`;
-    el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px;font-size:0.84rem;';
-    el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+  const el = document.createElement('div');
+  el.className = `alert alert-${type} alert-dismissible fade show`;
+  el.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;min-width:280px;font-size:.84rem;';
+  el.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }
 </script>
 {% endblock %}
