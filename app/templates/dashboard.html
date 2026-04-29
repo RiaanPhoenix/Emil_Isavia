@@ -2,203 +2,500 @@
 
 {% block title %}Emil Isavia - Analytics Dashboard{% endblock %}
 
-{% block head %}{% endblock %}
+{% block head %}
+<style>
+  /* ── Day Plan section ─────────────────────────────────── */
+  #plan-section .card-header { border-bottom: 1px solid rgba(255,255,255,.1); }
+
+  .task-row { transition: background .15s; }
+  .task-row:hover { background: rgba(13,110,253,.06); }
+
+  .badge-move1 { background: #0d6efd; }
+  .badge-move2 { background: #198754; }
+
+  .worker-w1 { color: #0d6efd; font-weight: 600; }
+  .worker-w2 { color: #6f42c1; font-weight: 600; }
+
+  .timeline-wrap {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  #timeline-canvas {
+    display: block;
+    min-width: 900px;
+  }
+
+  .warning-badge {
+    background: rgba(255,193,7,.15);
+    border-left: 3px solid #ffc107;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: .85rem;
+    margin-bottom: 4px;
+  }
+
+  .summary-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: .85rem;
+    margin: 2px;
+  }
+  .summary-pill span { font-weight: 600; }
+
+  #plan-status {
+    min-height: 32px;
+    font-size: .88rem;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1><i class="fas fa-chart-line text-primary"></i> Analytics Dashboard</h1>
-        <p class="lead text-muted">Performance metrics and operational insights</p>
-    </div>
+<div class="row mb-3">
+  <div class="col-12">
+    <h1><i class="fas fa-chart-line text-primary"></i> Analytics Dashboard</h1>
+    <p class="lead text-muted">Performance metrics and day-plan scheduling</p>
+  </div>
 </div>
 
-<!-- Key Metrics -->
+<!-- ── Key Metrics ──────────────────────────────────────────────── -->
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body text-center">
-                <h3 class="text-primary">95.2%</h3>
-                <p class="mb-0">Service Level</p>
-                <small class="text-muted">Cars ready on time</small>
-            </div>
-        </div>
+  <div class="col-md-3">
+    <div class="card metric-card">
+      <div class="card-body text-center">
+        <h3 class="text-primary">95.2%</h3>
+        <p class="mb-0">Service Level</p>
+        <small class="text-muted">Cars ready on time</small>
+      </div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body text-center">
-                <h3 class="text-warning">127.5</h3>
-                <p class="mb-0">Staff Hours/Day</p>
-                <small class="text-muted">Optimized schedule</small>
-            </div>
-        </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card metric-card">
+      <div class="card-body text-center">
+        <h3 class="text-warning">127.5</h3>
+        <p class="mb-0">Staff Hours/Day</p>
+        <small class="text-muted">Optimized schedule</small>
+      </div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body text-center">
-                <h3 class="text-info">2.3</h3>
-                <p class="mb-0">Avg Wait Time</p>
-                <small class="text-muted">Minutes (negative = early)</small>
-            </div>
-        </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card metric-card">
+      <div class="card-body text-center">
+        <h3 class="text-info">2.3</h3>
+        <p class="mb-0">Avg Wait Time</p>
+        <small class="text-muted">Minutes (negative = early)</small>
+      </div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body text-center">
-                <h3 class="text-success">89%</h3>
-                <p class="mb-0">Zone Utilization</p>
-                <small class="text-muted">Peak capacity usage</small>
-            </div>
-        </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card metric-card">
+      <div class="card-body text-center">
+        <h3 class="text-success">89%</h3>
+        <p class="mb-0">Zone Utilization</p>
+        <small class="text-muted">Peak capacity usage</small>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Charts Row -->
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-chart-area"></i> Daily Traffic Pattern</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="trafficChart" style="max-height: 400px;"></canvas>
-            </div>
-        </div>
+<!-- ── Charts Row ──────────────────────────────────────────────── -->
+<div class="row mb-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-chart-area"></i> Daily Traffic Pattern</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="trafficChart" style="max-height:400px;"></canvas>
+      </div>
     </div>
-    
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-chart-pie"></i> Zone Utilization</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="zoneChart" style="max-height: 400px;"></canvas>
-            </div>
-        </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-chart-pie"></i> Zone Utilization</h5>
+      </div>
+      <div class="card-body">
+        <canvas id="zoneChart" style="max-height:400px;"></canvas>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Recent Operations -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-history"></i> Recent Operations Summary</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Date</th>
-                                <th>Bookings</th>
-                                <th>Staff Hours</th>
-                                <th>Service Level</th>
-                                <th>Violations</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>2026-03-05</td>
-                                <td>63</td>
-                                <td>142.3</td>
-                                <td>94.1%</td>
-                                <td>2</td>
-                                <td><span class="badge bg-success">Optimal</span></td>
-                            </tr>
-                            <tr>
-                                <td>2026-03-04</td>
-                                <td>58</td>
-                                <td>128.7</td>
-                                <td>96.5%</td>
-                                <td>0</td>
-                                <td><span class="badge bg-success">Optimal</span></td>
-                            </tr>
-                            <tr>
-                                <td>2026-03-03</td>
-                                <td>71</td>
-                                <td>156.2</td>
-                                <td>93.0%</td>
-                                <td>3</td>
-                                <td><span class="badge bg-warning">Heuristic</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+<!-- ── Day Plan Scheduler ──────────────────────────────────────── -->
+<div class="row mb-4" id="plan-section">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h5 class="mb-0"><i class="fas fa-calendar-alt text-primary"></i> Day Plan — Greedy Scheduler</h5>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="date" id="plan-date" class="form-control form-control-sm"
+                 style="width:160px;" value="">
+          <button class="btn btn-primary btn-sm" id="btn-run-plan">
+            <i class="fas fa-play"></i> Generate Plan
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" id="btn-export-csv" disabled>
+            <i class="fas fa-download"></i> CSV
+          </button>
         </div>
+      </div>
+
+      <div class="card-body">
+        <!-- Status line -->
+        <div id="plan-status" class="text-muted mb-3"></div>
+
+        <!-- Summary pills (hidden until result arrives) -->
+        <div id="plan-summary" class="mb-3" style="display:none;"></div>
+
+        <!-- Warnings (hidden until result arrives) -->
+        <div id="plan-warnings" class="mb-3" style="display:none;"></div>
+
+        <!-- Timeline canvas -->
+        <div class="timeline-wrap mb-4" id="timeline-wrap" style="display:none;">
+          <canvas id="timeline-canvas" height="90"></canvas>
+        </div>
+
+        <!-- Task table -->
+        <div class="table-responsive" id="plan-table-wrap" style="display:none;">
+          <table class="table table-hover table-sm" id="plan-table">
+            <thead class="table-dark">
+              <tr>
+                <th>Type</th>
+                <th>Car ID</th>
+                <th>Worker</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Min</th>
+                <th>Move</th>
+                <th>Storage Deadline</th>
+                <th>Return Deadline</th>
+              </tr>
+            </thead>
+            <tbody id="plan-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Empty state -->
+        <div id="plan-empty" class="text-center text-muted py-5" style="display:none;">
+          <i class="fas fa-calendar-times fa-2x mb-2"></i><br>
+          No bookings found for this date.
+        </div>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- ── Recent Operations ──────────────────────────────────────── -->
+<div class="row mt-2">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-history"></i> Recent Operations Summary</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-dark">
+              <tr>
+                <th>Date</th><th>Bookings</th><th>Staff Hours</th>
+                <th>Service Level</th><th>Violations</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2026-03-05</td><td>63</td><td>142.3</td><td>94.1%</td><td>2</td>
+                <td><span class="badge bg-success">Optimal</span></td>
+              </tr>
+              <tr>
+                <td>2026-03-04</td><td>58</td><td>128.7</td><td>96.5%</td><td>0</td>
+                <td><span class="badge bg-success">Optimal</span></td>
+              </tr>
+              <tr>
+                <td>2026-03-03</td><td>71</td><td>156.2</td><td>93.0%</td><td>3</td>
+                <td><span class="badge bg-warning">Heuristic</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Sample charts
-document.addEventListener('DOMContentLoaded', function() {
-    // Traffic pattern chart
-    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
-    new Chart(trafficCtx, {
-        type: 'line',
-        data: {
-            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-            datasets: [{
-                label: 'Drop-offs',
-                data: [2, 1, 15, 8, 22, 6],
-                borderColor: '#0d6efd',
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                fill: true
-            }, {
-                label: 'Pick-ups',
-                data: [1, 3, 5, 18, 20, 12],
-                borderColor: '#198754',
-                backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Operations'
-                    }
-                }
-            }
-        }
+/* ── Static sample charts ──────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function () {
+  const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+  new Chart(trafficCtx, {
+    type: 'line',
+    data: {
+      labels: ['00:00','04:00','08:00','12:00','16:00','20:00'],
+      datasets: [{
+        label: 'Drop-offs',
+        data: [2,1,15,8,22,6],
+        borderColor: '#0d6efd',
+        backgroundColor: 'rgba(13,110,253,.1)',
+        fill: true
+      },{
+        label: 'Pick-ups',
+        data: [1,3,5,18,20,12],
+        borderColor: '#198754',
+        backgroundColor: 'rgba(25,135,84,.1)',
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'Operations' } } }
+    }
+  });
+
+  const zoneCtx = document.getElementById('zoneChart').getContext('2d');
+  new Chart(zoneCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Reception','Gull','P3','Delivery'],
+      datasets: [{ data: [14,45,120,18], backgroundColor: ['#0d6efd','#ffc107','#6f42c1','#198754'] }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  /* ── Day Plan ──────────────────────────────────────────────── */
+  // Default date = today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  document.getElementById('plan-date').value = todayStr;
+
+  let planData = null;   // last successful result
+
+  const elStatus   = document.getElementById('plan-status');
+  const elSummary  = document.getElementById('plan-summary');
+  const elWarnings = document.getElementById('plan-warnings');
+  const elTableWrap = document.getElementById('plan-table-wrap');
+  const elTbody    = document.getElementById('plan-tbody');
+  const elEmpty    = document.getElementById('plan-empty');
+  const elTimeline = document.getElementById('timeline-wrap');
+  const elExport   = document.getElementById('btn-export-csv');
+
+  document.getElementById('btn-run-plan').addEventListener('click', runPlan);
+  elExport.addEventListener('click', exportCsv);
+
+  function runPlan() {
+    const dateVal = document.getElementById('plan-date').value;
+    if (!dateVal) { alert('Please select a date.'); return; }
+
+    setStatus('<i class="fas fa-spinner fa-spin"></i> Generating plan…', 'text-muted');
+    elSummary.style.display  = 'none';
+    elWarnings.style.display = 'none';
+    elTableWrap.style.display = 'none';
+    elTimeline.style.display  = 'none';
+    elEmpty.style.display     = 'none';
+    elExport.disabled = true;
+    planData = null;
+
+    fetch('/api/greedy-schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: dateVal })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('Error: ' + data.error, 'text-danger'); return; }
+      planData = data;
+      renderPlan(data);
+    })
+    .catch(err => {
+      setStatus('Request failed: ' + err, 'text-danger');
     });
-    
-    // Zone utilization chart
-    const zoneCtx = document.getElementById('zoneChart').getContext('2d');
-    new Chart(zoneCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Reception', 'Gull', 'P3', 'Delivery'],
-            datasets: [{
-                data: [14, 45, 120, 18],
-                backgroundColor: [
-                    '#0d6efd',
-                    '#ffc107', 
-                    '#6f42c1',
-                    '#198754'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
+  }
+
+  function setStatus(html, cls) {
+    elStatus.innerHTML = html;
+    elStatus.className = (cls || 'text-muted') + ' mb-3';
+  }
+
+  function renderPlan(data) {
+    const tasks    = data.tasks    || [];
+    const warnings = data.warnings || [];
+    const summary  = data.summary  || {};
+    const storage  = data.storage  || '—';
+
+    // Status line
+    const srcLabel = data.source === 'api' ? '<span class="badge bg-success">API</span>'
+                                           : '<span class="badge bg-warning text-dark">No API</span>';
+    setStatus(
+      `Plan for <strong>${data.date}</strong> &nbsp;${srcLabel}&nbsp; `
+      + `Storage zone: <strong>${storage}</strong>`,
+      'text-muted'
+    );
+
+    // Summary pills
+    elSummary.innerHTML = [
+      pill('fas fa-car',       summary.total_cars    + ' cars'),
+      pill('fas fa-users',     summary.num_workers   + ' workers'),
+      pill('fas fa-clock',     summary.total_work_min + ' min work'),
+      pill('fas fa-hourglass', summary.total_work_h   + ' h total'),
+      pill('fas fa-warehouse', summary.n_gull + ' → Gull'),
+      pill('fas fa-warehouse', summary.n_p3   + ' → P3'),
+    ].join('');
+    elSummary.style.display = 'block';
+
+    // Warnings
+    if (warnings.length) {
+      elWarnings.innerHTML = warnings.map(w =>
+        `<div class="warning-badge"><i class="fas fa-exclamation-triangle text-warning me-1"></i>${escHtml(w)}</div>`
+      ).join('');
+      elWarnings.style.display = 'block';
+    }
+
+    // Table
+    if (tasks.length === 0) {
+      elEmpty.style.display = 'block';
+      return;
+    }
+
+    elTbody.innerHTML = tasks.map(r => {
+      const typeClass  = r.type === 'MOVE1' ? 'badge-move1' : 'badge-move2';
+      const wkrClass   = r.worker === 'W1'  ? 'worker-w1'   : 'worker-w2';
+      return `<tr class="task-row">
+        <td><span class="badge ${typeClass}">${escHtml(r.type)}</span></td>
+        <td>${escHtml(r.carId)}</td>
+        <td class="${wkrClass}">${escHtml(r.worker)}</td>
+        <td>${escHtml(r.start)}</td>
+        <td>${escHtml(r.end)}</td>
+        <td>${r.durationMin}</td>
+        <td><small>${escHtml(r.move)}</small></td>
+        <td><small class="text-warning">${escHtml(r.storageDeadline)}</small></td>
+        <td><small class="text-info">${escHtml(r.returnDeadline)}</small></td>
+      </tr>`;
+    }).join('');
+    elTableWrap.style.display = 'block';
+
+    // Timeline
+    drawTimeline(tasks);
+    elTimeline.style.display = 'block';
+
+    elExport.disabled = false;
+  }
+
+  /* ── Timeline chart ──────────────────────────────────────────── */
+  function drawTimeline(tasks) {
+    const canvas = document.getElementById('timeline-canvas');
+    const dpr    = window.devicePixelRatio || 1;
+    const W      = canvas.parentElement.clientWidth || 900;
+    const ROW_H  = 28;
+    const LABEL  = 110;  // left label width
+    const PAD_T  = 24;   // top padding for hour labels
+    const PAD_B  = 8;
+
+    // Determine workers present
+    const workers = [...new Set(tasks.map(t => t.worker))].sort();
+    const H = PAD_T + workers.length * ROW_H + PAD_B;
+
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Background
+    ctx.fillStyle = '#1a1f2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Hour grid
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.fillStyle   = 'rgba(255,255,255,.4)';
+    ctx.font        = '10px Inter, sans-serif';
+    ctx.textAlign   = 'center';
+    for (let h = 0; h <= 24; h += 2) {
+      const x = LABEL + (h / 24) * (W - LABEL);
+      ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, H - PAD_B); ctx.stroke();
+      ctx.fillText(String(h).padStart(2,'0') + ':00', x, PAD_T - 4);
+    }
+
+    // Worker rows
+    workers.forEach((wkr, i) => {
+      const y0 = PAD_T + i * ROW_H;
+      // Row label
+      ctx.fillStyle = wkr === 'W1' ? '#0d6efd' : '#6f42c1';
+      ctx.font      = '11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(wkr, 6, y0 + ROW_H / 2 + 4);
+
+      // Tasks for this worker
+      tasks.filter(t => t.worker === wkr).forEach(t => {
+        const [sh, sm] = t.start.slice(11).split(':').map(Number);
+        const [eh, em] = t.end.slice(11).split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        const endMin   = eh * 60 + em;
+        const x1 = LABEL + (startMin / 1440) * (W - LABEL);
+        const x2 = LABEL + (endMin   / 1440) * (W - LABEL);
+        const barW = Math.max(x2 - x1, 4);
+        const barH = ROW_H - 6;
+        const by   = y0 + 3;
+
+        ctx.fillStyle = t.type === 'MOVE1' ? '#0d6efd' : '#198754';
+        ctx.beginPath();
+        ctx.roundRect(x1, by, barW, barH, 3);
+        ctx.fill();
+
+        // Label inside bar if wide enough
+        if (barW > 30) {
+          ctx.fillStyle = '#fff';
+          ctx.font      = '9px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(t.carId, x1 + barW / 2, by + barH / 2 + 3);
         }
+      });
     });
+  }
+
+  /* ── CSV export ──────────────────────────────────────────────── */
+  function exportCsv() {
+    if (!planData || !planData.tasks.length) return;
+    const cols = ['type','carId','storage','worker','start','end','durationMin','move',
+                  'depFlight','arrFlight','storageDeadline','returnDeadline'];
+    const lines = [cols.join(',')];
+    planData.tasks.forEach(r => {
+      lines.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g,'""')}"`).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `day_plan_${planData.date}.csv`;
+    a.click();
+  }
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  function pill(icon, text) {
+    return `<span class="summary-pill"><i class="${icon}"></i><span>${text}</span></span>`;
+  }
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Auto-run if Canvas roundRect not supported, polyfill it
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      r = Math.min(r, w/2, h/2);
+      this.moveTo(x+r, y);
+      this.arcTo(x+w, y, x+w, y+h, r);
+      this.arcTo(x+w, y+h, x, y+h, r);
+      this.arcTo(x, y+h, x, y, r);
+      this.arcTo(x, y, x+w, y, r);
+      this.closePath();
+    };
+  }
 });
 </script>
 {% endblock %}

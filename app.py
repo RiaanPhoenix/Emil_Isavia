@@ -17,6 +17,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from app.api.flights import generate_bookings_from_api
 from app.api.parking_api import get_real_valet_bookings, test_api_connection
 from app.optimization.valet_optimizer import ValetOptimizer
+from app.optimization.greedy_scheduler import schedule_day
 from app.simulation.valet_sim import run_monte_carlo_simulation, ValetSimulation, generate_fifo_plan
 from app.simulation.valet_sim_v2 import SimParams, run_scenario as run_scenario_v2
 from config import settings
@@ -315,6 +316,23 @@ def simulate_page():
 def dashboard_page():
     """Analytics dashboard page."""
     return render_template('dashboard.html')
+
+
+@app.route('/api/greedy-schedule', methods=['POST'])
+def api_greedy_schedule():
+    """Run the greedy day-plan scheduler for a given date."""
+    try:
+        data = request.get_json(force=True) or {}
+        day_str = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        # Basic validation
+        datetime.strptime(day_str, '%Y-%m-%d')
+        result = schedule_day(day_str)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'error': f'Invalid date format: {e}'}), 400
+    except Exception as e:
+        log.exception('Greedy schedule error')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/live-feed')
