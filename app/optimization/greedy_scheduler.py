@@ -22,16 +22,19 @@ Public interface
 import bisect
 import base64
 import json
+import os
 import urllib.request
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 
+from dotenv import load_dotenv
 from config import settings
+
+load_dotenv()
 
 # ─────────────────────────────────────────────────────────
 # CONSTANTS — pulled from settings / env
 # ─────────────────────────────────────────────────────────
-import os
 API_URL      = os.getenv("PARKING_API_URL", "https://parking-api-dev-d8b2ejb0asc0gbec.northeurope-01.azurewebsites.net")
 API_USER     = os.getenv("PARKING_API_USERNAME", "")
 API_PASSWORD = os.getenv("PARKING_API_PASSWORD", "")
@@ -207,7 +210,10 @@ def _load_cars(day_str: str) -> Tuple[List[Car], str]:
     DEP = ["departure", "departureFlight", "dep", "departureTime", "departureDate", "Departure"]
     ARR = ["arrival", "arrivalFlight", "arr", "arrivalTime", "arrivalDate", "Arrival", "returnDate"]
 
-    ep = f"/premium-bookings?date_start={day_str}&date_end={day_str}"
+    # Look back 30 days to catch cars dropped off earlier that return today
+    day_dt   = datetime.strptime(day_str, "%Y-%m-%d")
+    lookback = (day_dt - timedelta(days=30)).strftime("%Y-%m-%d")
+    ep = f"/premium-bookings?date_start={lookback}&date_end={day_str}"
     try:
         result = _api_get(ep)
         raw = result if isinstance(result, list) else (
