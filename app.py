@@ -12,6 +12,9 @@ The system solves Isavia's valet parking operation at Keflavík Airport.
 import logging
 import json
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 
 from app.api.flights import generate_bookings_from_api
