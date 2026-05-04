@@ -41,13 +41,18 @@ API_PASSWORD = os.getenv("PARKING_API_PASSWORD", "")
 _AUTH        = "Basic " + base64.b64encode(f"{API_USER}:{API_PASSWORD}".encode()).decode()
 
 # Defaults — overridable per-call via schedule_day() params
-DEFAULT_WORKERS_DAY   = 2    # workers during day shift (06:00–18:00)
-DEFAULT_WORKERS_NIGHT = 1    # workers during night shift (18:00–06:00)
-DAY_SHIFT_START       = 6    # hour (24h)
-DAY_SHIFT_END         = 18   # hour (24h)
+DEFAULT_DAY_MOVERS    = 2     # movers 05:30–17:30
+DEFAULT_NIGHT_WORKERS = 2     # workers 17:30–05:30
+DEFAULT_SUPERVISOR    = True  # supervisor on 08:00–20:00 (handles phones)
+DEFAULT_MOVE2_WINDOW  = 60   # retrieval window: start no earlier than arr - 60 min
 PROCESS_MIN           = 1.5  # key-box handling time (minutes)
 DROPOFF_BEFORE_H      = 3    # customer drops off N hours before departure
-DEFAULT_MOVE2_WINDOW  = 60   # retrieval window: start no earlier than arr - 60 min
+
+# Shift boundaries (minutes from midnight)
+_DAY_START   =  5 * 60 + 30   # 05:30
+_DAY_END     = 17 * 60 + 30   # 17:30
+_SUP_START   =  8 * 60        # 08:00
+_SUP_END     = 20 * 60        # 20:00
 
 LOC_OFFICE = "Office"
 LOC_MOTT   = "Móttökustæði"
@@ -260,19 +265,37 @@ def _add_row(rows: list, move_type: str, car: Car, storage: str,
 # ─────────────────────────────────────────────────────────
 # GREEDY SCHEDULER
 # ─────────────────────────────────────────────────────────
-def _workers_at(minute: float, workers_day: int, workers_night: int) -> int:
-    """Return how many workers are on shift at a given minute-of-day."""
-    hour = minute / 60.0
-    if DAY_SHIFT_START <= hour < DAY_SHIFT_END:
-        return workers_day
-    return workers_night
+def _movers_at(minute: float, day_movers: int, night_workers: int, supervisor: bool) -> int:
+    """
+    Return how many movers are available at a given minute-of-day.
+
+    Rules:
+      05:30–08:00  day shift, no supervisor → one worker on phone → day_movers - 1
+      08:00–17:30  day shift + supervisor   → supervisor on phone → day_movers
+      17:30–20:00  night shift + supervisor → supervisor on phone → night_workers
+      20:00–05:30  night shift, no supervisor → one worker on phone → night_workers - 1
+    """
+    in_day   = _DAY_START <= minute < _DAY_END
+    sup_on   = supervisor and (_SUP_START <= minute < _SUP_END)
+
+    if in_day:
+        base = day_movers
+    else:
+        base = night_workers
+
+    # If no supervisor is covering phones, one worker must stay on phone
+    if not sup_on:
+        base = max(0, base - 1)
+
+    return base
 
 
 def _greedy_schedule(
     cars: List[Car],
     midnight: datetime,
-    workers_day: int = DEFAULT_WORKERS_DAY,
-    workers_night: int = DEFAULT_WORKERS_NIGHT,
+    day_movers: int = DEFAULT_DAY_MOVERS,
+    night_workers: int = DEFAULT_NIGHT_WORKERS,
+    supervisor: bool = DEFAULT_SUPERVISOR,
     move2_window: int = DEFAULT_MOVE2_WINDOW,
 ) -> Tuple[list, list]:
     dur_mott_gull = _mission_dur(LOC_MOTT, LOC_GULL)
@@ -280,8 +303,8 @@ def _greedy_schedule(
     dur_gull_skil = _mission_dur(LOC_GULL, LOC_SKIL)
     dur_p3_skil   = _mission_dur(LOC_P3,   LOC_SKIL)
 
-    # Total worker pool is the max across both shifts
-    num_workers = max(workers_day, workers_night)
+    # Total worker pool is the max across all shifts
+    num_workers = max(day_movers, night_workers)
     day_end = 1440.0
     rows, warnings = [], []
     worker_busy = [[] for _ in range(num_workers)]
@@ -301,8 +324,7 @@ def _greedy_schedule(
     for car in move2_cars:
         window_start = max(0.0, _to_mins(midnight, car.arr_flight - timedelta(minutes=move2_window)))
         latest_start = _to_mins(midnight, car.arr_flight) - move2_dur
-        # Only use workers available at the time of this move
-        active = _workers_at(latest_start, workers_day, workers_night)
+        active = _movers_at(latest_start, day_movers, night_workers, supervisor)
 
         best_choice = None
         for w in range(active):
@@ -340,7 +362,7 @@ def _greedy_schedule(
     for car in move1_cars:
         release  = max(0.0, _to_mins(midnight, car.dropoff))
         deadline = min(day_end, _to_mins(midnight, car.storage_ddl))
-        active   = _workers_at(release, workers_day, workers_night)
+        active   = _movers_at(release, day_movers, night_workers, supervisor)
 
         best_choice = None
         for w in range(active):
@@ -375,8 +397,9 @@ def _greedy_schedule(
 # ─────────────────────────────────────────────────────────
 def schedule_day(
     day_str: str,
-    workers_day: int = DEFAULT_WORKERS_DAY,
-    workers_night: int = DEFAULT_WORKERS_NIGHT,
+    day_movers: int = DEFAULT_DAY_MOVERS,
+    night_workers: int = DEFAULT_NIGHT_WORKERS,
+    supervisor: bool = DEFAULT_SUPERVISOR,
     move2_window: int = DEFAULT_MOVE2_WINDOW,
 ) -> dict:
     """
@@ -384,12 +407,12 @@ def schedule_day(
 
     Args:
         day_str:       Date string YYYY-MM-DD
-        workers_day:   Staff count during day shift (06:00–18:00)
-        workers_night: Staff count during night shift (18:00–06:00)
+        day_movers:    Movers on day shift 05:30–17:30 (default 2)
+        night_workers: Workers on night shift 17:30–05:30 (default 2)
+        supervisor:    Supervisor on 08:00–20:00, covers phones (default True)
         move2_window:  Minutes before arrival to start retrieval (default 60)
 
-    Returns a dict ready for JSON serialization:
-        date, tasks, warnings, summary, storage, source
+    Returns a dict ready for JSON serialization.
     """
     midnight = datetime.strptime(day_str, "%Y-%m-%d")
     cars, source, skipped = _load_cars(day_str)
@@ -406,8 +429,9 @@ def schedule_day(
 
     tasks, warnings, storage = _greedy_schedule(
         cars, midnight,
-        workers_day=workers_day,
-        workers_night=workers_night,
+        day_movers=day_movers,
+        night_workers=night_workers,
+        supervisor=supervisor,
         move2_window=move2_window,
     )
 
@@ -426,9 +450,9 @@ def schedule_day(
             "n_gull":         n_gull,
             "n_p3":           n_p3,
             "skipped":        skipped,
-            "num_workers":    workers_day + workers_night,
-            "workers_day":    workers_day,
-            "workers_night":  workers_night,
+            "day_movers":     day_movers,
+            "night_workers":  night_workers,
+            "supervisor":     supervisor,
             "move2_window":   move2_window,
         },
         "storage": storage,
