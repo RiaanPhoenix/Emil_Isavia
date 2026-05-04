@@ -64,8 +64,20 @@
     <div class="card mb-4">
       <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span><i class="fas fa-calendar-alt"></i> Day Plan</span>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <input type="date" id="planDate" class="form-control form-control-sm" style="width:155px;">
+          <div class="d-flex align-items-center gap-1">
+            <label class="form-label mb-0 text-nowrap small">Day workers</label>
+            <input type="number" id="workerDay" value="2" min="1" max="10" class="form-control form-control-sm" style="width:60px;">
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <label class="form-label mb-0 text-nowrap small">Night workers</label>
+            <input type="number" id="workerNight" value="1" min="0" max="10" class="form-control form-control-sm" style="width:60px;">
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <label class="form-label mb-0 text-nowrap small">Retrieval window (min)</label>
+            <input type="number" id="move2Window" value="60" min="15" max="240" step="15" class="form-control form-control-sm" style="width:70px;">
+          </div>
           <button class="btn btn-primary btn-sm" id="btnGenerate" onclick="generatePlan()">
             <i class="fas fa-play"></i> Generate Plan
           </button>
@@ -261,10 +273,14 @@ function generatePlan() {
   setStatus('<i class="fas fa-spinner fa-spin"></i> Fetching bookings and scheduling…', 'text-muted');
   planData = null;
 
+  const workers_day   = parseInt(document.getElementById('workerDay').value)   || 2;
+  const workers_night = parseInt(document.getElementById('workerNight').value) || 1;
+  const move2_window  = parseInt(document.getElementById('move2Window').value) || 60;
+
   fetch('/api/greedy-schedule', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date })
+    body: JSON.stringify({ date, workers_day, workers_night, move2_window })
   })
   .then(r => r.json())
   .then(data => {

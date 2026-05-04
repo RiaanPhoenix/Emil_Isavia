@@ -326,10 +326,18 @@ def api_greedy_schedule():
     """Run the greedy day-plan scheduler for a given date."""
     try:
         data = request.get_json(force=True) or {}
-        day_str = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        day_str      = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        workers_day  = int(data.get('workers_day',   2))
+        workers_night = int(data.get('workers_night', 1))
+        move2_window = int(data.get('move2_window',  60))
         # Basic validation
         datetime.strptime(day_str, '%Y-%m-%d')
-        result = schedule_day(day_str)
+        result = schedule_day(
+            day_str,
+            workers_day=workers_day,
+            workers_night=workers_night,
+            move2_window=move2_window,
+        )
         return jsonify(result)
     except ValueError as e:
         return jsonify({'error': f'Invalid date format: {e}'}), 400

@@ -40,10 +40,14 @@ API_USER     = os.getenv("PARKING_API_USERNAME", "")
 API_PASSWORD = os.getenv("PARKING_API_PASSWORD", "")
 _AUTH        = "Basic " + base64.b64encode(f"{API_USER}:{API_PASSWORD}".encode()).decode()
 
-NUM_WORKERS       = 2
-PROCESS_MIN       = 1.5   # key-box handling time (minutes)
-DROPOFF_BEFORE_H  = 3     # customer drops off N hours before departure
-MOVE2_WINDOW_MIN  = 60    # retrieval window: start no earlier than arr - 60 min
+# Defaults — overridable per-call via schedule_day() params
+DEFAULT_WORKERS_DAY   = 2    # workers during day shift (06:00–18:00)
+DEFAULT_WORKERS_NIGHT = 1    # workers during night shift (18:00–06:00)
+DAY_SHIFT_START       = 6    # hour (24h)
+DAY_SHIFT_END         = 18   # hour (24h)
+PROCESS_MIN           = 1.5  # key-box handling time (minutes)
+DROPOFF_BEFORE_H      = 3    # customer drops off N hours before departure
+DEFAULT_MOVE2_WINDOW  = 60   # retrieval window: start no earlier than arr - 60 min
 
 LOC_OFFICE = "Office"
 LOC_MOTT   = "Móttökustæði"
@@ -256,15 +260,31 @@ def _add_row(rows: list, move_type: str, car: Car, storage: str,
 # ─────────────────────────────────────────────────────────
 # GREEDY SCHEDULER
 # ─────────────────────────────────────────────────────────
-def _greedy_schedule(cars: List[Car], midnight: datetime) -> Tuple[list, list]:
+def _workers_at(minute: float, workers_day: int, workers_night: int) -> int:
+    """Return how many workers are on shift at a given minute-of-day."""
+    hour = minute / 60.0
+    if DAY_SHIFT_START <= hour < DAY_SHIFT_END:
+        return workers_day
+    return workers_night
+
+
+def _greedy_schedule(
+    cars: List[Car],
+    midnight: datetime,
+    workers_day: int = DEFAULT_WORKERS_DAY,
+    workers_night: int = DEFAULT_WORKERS_NIGHT,
+    move2_window: int = DEFAULT_MOVE2_WINDOW,
+) -> Tuple[list, list]:
     dur_mott_gull = _mission_dur(LOC_MOTT, LOC_GULL)
     dur_mott_p3   = _mission_dur(LOC_MOTT, LOC_P3)
     dur_gull_skil = _mission_dur(LOC_GULL, LOC_SKIL)
     dur_p3_skil   = _mission_dur(LOC_P3,   LOC_SKIL)
 
+    # Total worker pool is the max across both shifts
+    num_workers = max(workers_day, workers_night)
     day_end = 1440.0
     rows, warnings = [], []
-    worker_busy = [[] for _ in range(NUM_WORKERS)]
+    worker_busy = [[] for _ in range(num_workers)]
     day0 = midnight
     day1 = midnight + timedelta(days=1)
 
@@ -274,25 +294,25 @@ def _greedy_schedule(cars: List[Car], midnight: datetime) -> Tuple[list, list]:
     move2_dur = dur_gull_skil if storage == "Gull" else dur_p3_skil
 
     # ── MOVE2 pass: schedule retrievals (storage → delivery) ──────────
-    # Sort by arrival so earliest returns get scheduled first
     move2_cars = sorted(
         [c for c in cars if day0 <= c.arr_flight < day1],
         key=lambda c: c.arr_flight,
     )
     for car in move2_cars:
-        window_start = max(0.0, _to_mins(midnight, car.arr_flight - timedelta(minutes=MOVE2_WINDOW_MIN)))
+        window_start = max(0.0, _to_mins(midnight, car.arr_flight - timedelta(minutes=move2_window)))
         latest_start = _to_mins(midnight, car.arr_flight) - move2_dur
+        # Only use workers available at the time of this move
+        active = _workers_at(latest_start, workers_day, workers_night)
 
         best_choice = None
-        for w in range(NUM_WORKERS):
+        for w in range(active):
             t = _find_slot(worker_busy[w], latest_start, window_start, move2_dur, day_end)
             if t is not None and (best_choice is None or t > best_choice[0]):
                 best_choice = (t, w)
 
         started_early = False
         if best_choice is None:
-            # Fall back: allow starting before the 60-min window
-            for w in range(NUM_WORKERS):
+            for w in range(active):
                 t = _find_slot(worker_busy[w], latest_start, 0.0, move2_dur, day_end)
                 if t is not None and (best_choice is None or t > best_choice[0]):
                     best_choice = (t, w)
@@ -313,7 +333,6 @@ def _greedy_schedule(cars: List[Car], midnight: datetime) -> Tuple[list, list]:
         _add_row(rows, "MOVE2", car, storage, w, start, move2_dur, midnight)
 
     # ── MOVE1 pass: schedule drop-offs (reception → storage) ──────────
-    # Sort by dropoff time (FIFO)
     move1_cars = sorted(
         [c for c in cars if day0 <= c.dropoff < day1],
         key=lambda c: c.dropoff,
@@ -321,9 +340,10 @@ def _greedy_schedule(cars: List[Car], midnight: datetime) -> Tuple[list, list]:
     for car in move1_cars:
         release  = max(0.0, _to_mins(midnight, car.dropoff))
         deadline = min(day_end, _to_mins(midnight, car.storage_ddl))
+        active   = _workers_at(release, workers_day, workers_night)
 
         best_choice = None
-        for w in range(NUM_WORKERS):
+        for w in range(active):
             candidate = release
             for busy_start, busy_end in worker_busy[w]:
                 if candidate + move1_dur <= busy_start:
@@ -353,9 +373,20 @@ def _greedy_schedule(cars: List[Car], midnight: datetime) -> Tuple[list, list]:
 # ─────────────────────────────────────────────────────────
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────────────────
-def schedule_day(day_str: str) -> dict:
+def schedule_day(
+    day_str: str,
+    workers_day: int = DEFAULT_WORKERS_DAY,
+    workers_night: int = DEFAULT_WORKERS_NIGHT,
+    move2_window: int = DEFAULT_MOVE2_WINDOW,
+) -> dict:
     """
     Run the greedy scheduler for a given date.
+
+    Args:
+        day_str:       Date string YYYY-MM-DD
+        workers_day:   Staff count during day shift (06:00–18:00)
+        workers_night: Staff count during night shift (18:00–06:00)
+        move2_window:  Minutes before arrival to start retrieval (default 60)
 
     Returns a dict ready for JSON serialization:
         date, tasks, warnings, summary, storage, source
@@ -373,7 +404,12 @@ def schedule_day(day_str: str) -> dict:
             "source":   source,
         }
 
-    tasks, warnings, storage = _greedy_schedule(cars, midnight)
+    tasks, warnings, storage = _greedy_schedule(
+        cars, midnight,
+        workers_day=workers_day,
+        workers_night=workers_night,
+        move2_window=move2_window,
+    )
 
     n_gull       = sum(1 for r in tasks if r["type"] == "MOVE1" and r["storage"] == "Gull")
     n_p3         = sum(1 for r in tasks if r["type"] == "MOVE1" and r["storage"] == "P3")
@@ -390,7 +426,10 @@ def schedule_day(day_str: str) -> dict:
             "n_gull":         n_gull,
             "n_p3":           n_p3,
             "skipped":        skipped,
-            "num_workers":    NUM_WORKERS,
+            "num_workers":    workers_day + workers_night,
+            "workers_day":    workers_day,
+            "workers_night":  workers_night,
+            "move2_window":   move2_window,
         },
         "storage": storage,
         "source":  source,
