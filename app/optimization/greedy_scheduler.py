@@ -31,6 +31,23 @@ LOC_P3     = "P3"
 LOC_SKIL   = "Skilastæði"
 
 
+
+
+# ─────────────────────────────────────────────────────────
+# BÍLAHLUTUR
+# ─────────────────────────────────────────────────────────
+class Car:
+    def __init__(self, car_id: str, dep: datetime, arr: datetime):
+        self.car_id      = car_id
+        self.dep_flight  = dep
+        self.arr_flight  = arr
+        self.dropoff     = dep - timedelta(hours=DROPOFF_BEFORE_H)
+        self.storage_ddl = dep.replace(hour=23, minute=59, second=0, microsecond=0)
+        self.return_ddl  = arr - timedelta(minutes=RETURN_BUFFER_MIN)
+
+    def __repr__(self):
+        return f"Car({self.car_id})"
+
 # ─────────────────────────────────────────────────────────
 # HJÁLPARFÖLL
 # ─────────────────────────────────────────────────────────
@@ -302,3 +319,169 @@ def fifo_schedule(cars: list,
         })
 
     return rows, warnings
+
+
+# ─────────────────────────────────────────────────────────
+# schedule_day — public entry point used by app.py
+# ─────────────────────────────────────────────────────────
+import base64 as _base64
+import json as _json
+import os as _os
+import urllib.request as _urllib_req
+
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv()
+except ImportError:
+    pass
+
+try:
+    from config import settings as _settings
+    _WALK_GULL       = _settings.WALK_GULL_TO_RECEPTION
+    _WALK_P3         = _settings.WALK_P3_TO_RECEPTION
+    _WALK_SKIL       = _settings.WALK_DELIVERY_TO_GULL
+    _DRIVE_MOTT_GULL = _settings.TRAVEL_RECEPTION_TO_GULL
+    _DRIVE_MOTT_P3   = _settings.TRAVEL_RECEPTION_TO_P3
+    _DRIVE_GULL_SKIL = _settings.TRAVEL_GULL_TO_DELIVERY
+    _DRIVE_P3_SKIL   = _settings.TRAVEL_P3_TO_DELIVERY
+except Exception:
+    _WALK_GULL = 3.0;  _WALK_P3 = 5.0;  _WALK_SKIL = 4.0
+    _DRIVE_MOTT_GULL = 6.0;  _DRIVE_MOTT_P3 = 8.0
+    _DRIVE_GULL_SKIL = 5.0;  _DRIVE_P3_SKIL = 7.0
+
+_SD_API_URL      = _os.getenv("PARKING_API_URL",     "https://parking-api-dev-d8b2ejb0asc0gbec.northeurope-01.azurewebsites.net")
+_SD_API_USER     = _os.getenv("PARKING_API_USERNAME", _os.getenv("API_USER", ""))
+_SD_API_PASSWORD = _os.getenv("PARKING_API_PASSWORD", _os.getenv("API_PASSWORD", ""))
+
+_DEFAULT_DAY_MOVERS    = 2
+_DEFAULT_NIGHT_WORKERS = 2
+_DEFAULT_SUPERVISOR    = True
+_DEFAULT_MOVE2_WINDOW  = 60
+
+
+def _sd_auth():
+    return "Basic " + _base64.b64encode(f"{_SD_API_USER}:{_SD_API_PASSWORD}".encode()).decode()
+
+
+def _sd_api_get(endpoint):
+    url = _SD_API_URL.rstrip("/") + "/" + endpoint.lstrip("/")
+    req = _urllib_req.Request(url, headers={"Authorization": _sd_auth(), "Accept": "application/json"})
+    with _urllib_req.urlopen(req, timeout=30) as r:
+        return _json.loads(r.read().decode("utf-8"))
+
+
+def _sd_parse_dt(s: str) -> datetime:
+    s = str(s).strip().replace("T", " ").split(".")[0].split("+")[0].replace("Z", "").strip()
+    for f in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+              "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y",
+              "%d/%m/%Y %H:%M", "%m/%d/%Y %H:%M"):
+        try:
+            return datetime.strptime(s, f)
+        except ValueError:
+            pass
+    raise ValueError(f"Cannot parse: {s!r}")
+
+
+def _sd_load_cars(day_str: str):
+    ID  = ["carId","car_id","CarId","id","bookingId","licensePlate","plateNumber"]
+    DEP = ["departure","departureFlight","dep","departureTime","departureDate","Departure"]
+    ARR = ["arrival","arrivalFlight","arr","arrivalTime","arrivalDate","Arrival","returnDate"]
+
+    day_dt   = datetime.strptime(day_str, "%Y-%m-%d")
+    lookback = (day_dt - timedelta(days=30)).strftime("%Y-%m-%d")
+    day0     = day_dt.replace(hour=0,  minute=0,  second=0, microsecond=0)
+    day1     = day_dt.replace(hour=23, minute=59, second=0, microsecond=0)
+
+    def pick(rec, keys):
+        for k in keys:
+            if k in rec and rec[k] not in (None, ""): return str(rec[k])
+        nl = lambda s: s.lower().replace("_","").replace(" ","")
+        for k in keys:
+            for rk in rec:
+                if nl(k) in nl(rk) and rec[rk] not in (None,""): return str(rec[rk])
+        return None
+
+    try:
+        ep     = f"/premium-bookings?date_start={lookback}&date_end={day_str}"
+        result = _sd_api_get(ep)
+        raw    = result if isinstance(result, list) else (
+            result.get("data") or result.get("bookings") or result.get("reservations") or [])
+    except Exception as e:
+        return [], f"api_error: {e}", 0
+
+    cars, skipped = [], 0
+    for rec in raw:
+        cid     = pick(rec, ID)
+        dep_raw = pick(rec, DEP)
+        arr_raw = pick(rec, ARR)
+        if not cid or not dep_raw or not arr_raw:
+            skipped += 1; continue
+        try:
+            dep = _sd_parse_dt(dep_raw)
+            arr = _sd_parse_dt(arr_raw)
+        except ValueError:
+            skipped += 1; continue
+        if dep > arr: dep, arr = arr, dep
+        c = Car(cid, dep, arr)
+        if (day0 <= c.dropoff <= day1) or (day0 <= c.return_ddl <= day1):
+            cars.append(c)
+
+    return cars, "api", skipped
+
+
+def schedule_day(
+    day_str: str,
+    day_movers: int = _DEFAULT_DAY_MOVERS,
+    night_workers: int = _DEFAULT_NIGHT_WORKERS,
+    supervisor: bool = _DEFAULT_SUPERVISOR,
+    move2_window: int = _DEFAULT_MOVE2_WINDOW,
+) -> dict:
+    """Public entry point for app.py — loads bookings and runs fifo_schedule."""
+    midnight = datetime.strptime(day_str, "%Y-%m-%d")
+    cars, source, skipped = _sd_load_cars(day_str)
+
+    if not cars:
+        return {
+            "date":     day_str,
+            "tasks":    [],
+            "warnings": [f"No bookings found for {day_str} (source: {source})"],
+            "summary":  {"total_cars": 0, "total_work_min": 0, "n_gull": 0, "n_p3": 0, "skipped": skipped},
+            "storage":  None,
+            "source":   source,
+        }
+
+    dur1_gull = _WALK_GULL + PROCESS_MIN + _DRIVE_MOTT_GULL
+    dur1_p3   = _WALK_P3   + PROCESS_MIN + _DRIVE_MOTT_P3
+    dur2_gull = _DRIVE_GULL_SKIL + _WALK_SKIL
+    dur2_p3   = _DRIVE_P3_SKIL   + _WALK_SKIL
+
+    d1g = {c.car_id: dur1_gull for c in cars}
+    d1p = {c.car_id: dur1_p3   for c in cars}
+    d2g = {c.car_id: dur2_gull for c in cars}
+    d2p = {c.car_id: dur2_p3   for c in cars}
+
+    tasks, warnings = fifo_schedule(cars, d1g, d1p, d2g, d2p, midnight)
+
+    n_gull     = sum(1 for r in tasks if r["type"] == "MOVE1" and r["storage"] == "Gull")
+    n_p3       = sum(1 for r in tasks if r["type"] == "MOVE1" and r["storage"] == "P3")
+    total_work = sum(r["durationMin"] for r in tasks)
+
+    return {
+        "date":     day_str,
+        "tasks":    tasks,
+        "warnings": warnings,
+        "summary": {
+            "total_cars":     len(cars),
+            "total_work_min": round(total_work, 1),
+            "total_work_h":   round(total_work / 60, 2),
+            "n_gull":         n_gull,
+            "n_p3":           n_p3,
+            "skipped":        skipped,
+            "day_movers":     day_movers,
+            "night_workers":  night_workers,
+            "supervisor":     supervisor,
+            "move2_window":   move2_window,
+        },
+        "storage": "Gull" if n_gull >= n_p3 else "P3",
+        "source":  source,
+    }
