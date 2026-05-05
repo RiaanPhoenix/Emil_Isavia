@@ -20,7 +20,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from app.api.flights import generate_bookings_from_api
 from app.api.parking_api import get_real_valet_bookings, test_api_connection
 from app.optimization.valet_optimizer import ValetOptimizer
-from app.optimization.greedy_scheduler import schedule_day
+from app.optimization.greedy_scheduler import schedule_day, schedule_range
 from app.simulation.valet_sim import run_monte_carlo_simulation, ValetSimulation, generate_fifo_plan
 from app.simulation.valet_sim_v2 import SimParams, run_scenario as run_scenario_v2
 from config import settings
@@ -345,6 +345,28 @@ def api_greedy_schedule():
         return jsonify({'error': f'Invalid date format: {e}'}), 400
     except Exception as e:
         log.exception('Greedy schedule error')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/greedy-schedule-range', methods=['POST'])
+def api_greedy_schedule_range():
+    """Run the greedy scheduler for a date range."""
+    try:
+        data          = request.get_json(force=True) or {}
+        date_from     = data.get('date_from', datetime.now().strftime('%Y-%m-%d'))
+        date_to       = data.get('date_to',   date_from)
+        day_movers    = int(data.get('day_movers',    2))
+        night_workers = int(data.get('night_workers', 2))
+        supervisor    = bool(data.get('supervisor',   True))
+        move2_window  = int(data.get('move2_window',  60))
+        datetime.strptime(date_from, '%Y-%m-%d')
+        datetime.strptime(date_to,   '%Y-%m-%d')
+        result = schedule_range(date_from, date_to, day_movers, night_workers, supervisor, move2_window)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'error': f'Invalid date format: {e}'}), 400
+    except Exception as e:
+        log.exception('Greedy schedule range error')
         return jsonify({'error': str(e)}), 500
 
 
