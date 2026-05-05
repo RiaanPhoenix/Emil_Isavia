@@ -32,6 +32,10 @@
   #plan-status { min-height: 28px; font-size: .87rem; }
 
   .task-row:hover { background: rgba(13,110,253,.06); }
+  .ts-drop  { color: #adb5bd; }
+  .ts-ready { color: #20c997; }
+  #planDayTabs .nav-link { color: rgba(255,255,255,.55); font-size:.82rem; padding:4px 12px; border:none; background:transparent; cursor:pointer; }
+  #planDayTabs .nav-link.active { color:#fff; border-bottom:2px solid #0d6efd; }
 </style>
 {% endblock %}
 
@@ -65,7 +69,17 @@
       <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span><i class="fas fa-calendar-alt"></i> Day Plan</span>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <input type="date" id="planDate" class="form-control form-control-sm" style="width:155px;">
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <input type="date" id="planDateFrom" class="form-control form-control-sm" style="width:145px;" title="From">
+            <span class="text-muted small">–</span>
+            <input type="date" id="planDateTo"   class="form-control form-control-sm" style="width:145px;" title="To">
+          </div>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" onclick="setRange(0,0)" title="Today">1d</button>
+            <button class="btn btn-outline-secondary" onclick="setRange(0,6)" title="Next 7 days">7d</button>
+            <button class="btn btn-outline-secondary" onclick="setRange(0,13)" title="Next 14 days">14d</button>
+            <button class="btn btn-outline-secondary" onclick="setRange(0,29)" title="Next 30 days">30d</button>
+          </div>
           <div class="d-flex align-items-center gap-1">
             <label class="form-label mb-0 text-nowrap small">Day movers <span class="text-muted">(05:30–17:30)</span></label>
             <input type="number" id="workerDay" value="2" min="1" max="10" class="form-control form-control-sm" style="width:60px;">
@@ -103,6 +117,9 @@
 
         <!-- Warnings -->
         <div id="planWarnings" style="display:none;" class="mb-3"></div>
+
+        <!-- Day tabs (shown for multi-day ranges) -->
+        <ul class="nav nav-tabs mb-3" id="planDayTabs" style="display:none; border-bottom:1px solid rgba(255,255,255,.1);"></ul>
 
         <!-- Gantt timeline -->
         <div class="timeline-wrap mb-3" id="timelineWrap" style="display:none;">
@@ -247,7 +264,9 @@
 let planData = null;
 
 document.addEventListener('DOMContentLoaded', function () {
-  document.getElementById('planDate').value = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('planDateFrom').value = today;
+  document.getElementById('planDateTo').value   = today;
   refreshStatus();
   loadLiveFeed();
   setInterval(loadLiveFeed, 30000);
@@ -267,19 +286,30 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 /* ── Generate Plan ───────────────────────────────────────────── */
+/* ── Quick range setter ─────────────────────────────────────── */
+function setRange(fromOffsetDays, toOffsetDays) {
+  const from = new Date(); from.setDate(from.getDate() + fromOffsetDays);
+  const to   = new Date(); to.setDate(to.getDate()   + toOffsetDays);
+  document.getElementById('planDateFrom').value = from.toISOString().slice(0,10);
+  document.getElementById('planDateTo').value   = to.toISOString().slice(0,10);
+}
+
 function generatePlan() {
-  const date = document.getElementById('planDate').value;
-  if (!date) { showToast('Please select a date', 'warning'); return; }
+  const dateFrom = document.getElementById('planDateFrom').value;
+  const dateTo   = document.getElementById('planDateTo').value   || dateFrom;
+  if (!dateFrom) { showToast('Please select a date', 'warning'); return; }
 
   const btn = document.getElementById('btnGenerate');
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading…';
   btn.disabled = true;
   document.getElementById('btnCsv').disabled = true;
-  document.getElementById('planSummary').style.display  = 'none';
-  document.getElementById('planWarnings').style.display = 'none';
+  document.getElementById('planSummary').style.display   = 'none';
+  document.getElementById('planWarnings').style.display  = 'none';
   document.getElementById('planTableWrap').style.display = 'none';
   document.getElementById('timelineWrap').style.display  = 'none';
   document.getElementById('planPlaceholder').style.display = 'none';
+  const dayTabsEl = document.getElementById('planDayTabs');
+  if (dayTabsEl) dayTabsEl.innerHTML = '';
   setStatus('<i class="fas fa-spinner fa-spin"></i> Fetching bookings and scheduling…', 'text-muted');
   planData = null;
 
@@ -288,10 +318,10 @@ function generatePlan() {
   const supervisor    = document.getElementById('supervisorOn').checked;
   const move2_window  = parseInt(document.getElementById('move2Window').value)  || 60;
 
-  fetch('/api/greedy-schedule', {
+  fetch('/api/greedy-schedule-range', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, day_movers, night_workers, supervisor, move2_window })
+    body: JSON.stringify({ date_from: dateFrom, date_to: dateTo, day_movers, night_workers, supervisor, move2_window })
   })
   .then(r => r.json())
   .then(data => {
@@ -313,46 +343,82 @@ function setStatus(html, cls) {
 }
 
 function renderPlan(data) {
-  const tasks    = data.tasks    || [];
+  // Normalise: range response has data.days; single-day compat has data.tasks
+  const days    = data.days || [{ date: data.date, tasks: data.tasks || [], warnings: data.warnings || [], summary: data.summary || {} }];
+  const summary = data.summary || {};
   const warnings = data.warnings || [];
-  const summary  = data.summary  || {};
-  const storage  = data.storage  || '—';
+  const nDays   = data.n_days || 1;
 
   const srcBadge = data.source === 'api'
     ? '<span class="badge bg-success">Live API</span>'
     : '<span class="badge bg-warning text-dark">No API data</span>';
-  setStatus(
-    `Plan for <strong>${data.date}</strong> &nbsp;${srcBadge}&nbsp; Storage: <strong>${storage}</strong>`,
-    'text-muted'
-  );
+
+  const rangeLabel = nDays > 1
+    ? `<strong>${data.date_from}</strong> – <strong>${data.date_to}</strong> (${nDays} days)`
+    : `<strong>${data.date_from || data.date}</strong>`;
+  setStatus(`${rangeLabel} &nbsp;${srcBadge}`, 'text-muted');
 
   // Summary pills
   document.getElementById('planSummary').innerHTML = [
-    pill('fas fa-car',       summary.total_cars    + ' bookings'),
-    pill('fas fa-users',     summary.num_workers   + ' workers'),
-    pill('fas fa-clock',     summary.total_work_min + ' min'),
-    pill('fas fa-hourglass', summary.total_work_h  + ' h'),
-    pill('fas fa-arrow-right', (summary.n_move1 ?? summary.n_gull ?? '?') + ' MOVE1'),
-    pill('fas fa-arrow-left',  (summary.n_move2 ?? summary.n_p3   ?? '?') + ' MOVE2'),
+    pill('fas fa-car',         (summary.total_cars     ?? '?') + ' cars'),
+    pill('fas fa-clock',       (summary.total_work_min ?? '?') + ' min'),
+    pill('fas fa-hourglass',   (summary.total_work_h   ?? '?') + ' h'),
+    pill('fas fa-arrow-right', (summary.n_move1        ?? '?') + ' MOVE1'),
+    pill('fas fa-arrow-left',  (summary.n_move2        ?? '?') + ' MOVE2'),
+    pill('fas fa-redo',        (summary.n_backhaul     ?? '0') + ' backhauled'),
   ].join('');
   document.getElementById('planSummary').style.display = 'block';
 
   // Quick stats bar
-  document.getElementById('statCars').textContent   = summary.total_cars   ?? '—';
-  document.getElementById('statWorkH').textContent  = summary.total_work_h ?? '—';
-  document.getElementById('statMoves').textContent  = tasks.length;
+  document.getElementById('statCars').textContent  = summary.total_cars   ?? '—';
+  document.getElementById('statWorkH').textContent = summary.total_work_h ?? '—';
+  document.getElementById('statMoves').textContent = summary.total_tasks  ?? (data.all_tasks || []).length;
 
-  // Warnings
-  if (warnings.length) {
-    document.getElementById('planWarnings').innerHTML = warnings.map(w =>
-      `<div class="warning-badge"><i class="fas fa-exclamation-triangle text-warning me-1"></i>${esc(w)}</div>`
-    ).join('');
-    document.getElementById('planWarnings').style.display = 'block';
+  // Warnings (backhauled ones get green, rest get yellow)
+  const warns  = warnings.filter(w => !String(w).includes('BACKHAUL'));
+  const bhauls = warnings.filter(w =>  String(w).includes('BACKHAUL'));
+  let wHtml = '';
+  warns.forEach(w  => { wHtml += `<div class="warning-badge"><i class="fas fa-exclamation-triangle text-warning me-1"></i>${esc(w)}</div>`; });
+  bhauls.forEach(w => { wHtml += `<div class="warning-badge" style="border-color:#198754;background:rgba(25,135,84,.1)"><i class="fas fa-redo text-success me-1"></i>${esc(w)}</div>`; });
+  if (wHtml) { document.getElementById('planWarnings').innerHTML = wHtml; document.getElementById('planWarnings').style.display = 'block'; }
+
+  // Day tabs for multi-day
+  const tabsEl = document.getElementById('planDayTabs');
+  if (tabsEl) {
+    if (nDays > 1) {
+      tabsEl.innerHTML = days.map((d, i) =>
+        `<li class="nav-item">
+           <a class="nav-link${i===0?' active':''}" data-idx="${i}" href="#" style="font-size:.82rem;padding:3px 10px;">
+             ${d.date} <span class="badge bg-secondary ms-1">${(d.tasks||[]).length}</span>
+           </a>
+         </li>`
+      ).join('');
+      tabsEl.style.display = '';
+      tabsEl.querySelectorAll('.nav-link').forEach(a => {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          tabsEl.querySelectorAll('.nav-link').forEach(x => x.classList.remove('active'));
+          a.classList.add('active');
+          renderDayTasks(days[parseInt(a.dataset.idx)]);
+        });
+      });
+    } else {
+      tabsEl.style.display = 'none';
+    }
   }
 
+  renderDayTasks(days[0] || { tasks: [], warnings: [] });
+  document.getElementById('btnCsv').disabled = false;
+}
+
+function renderDayTasks(day) {
+  const tasks = (day && day.tasks) ? day.tasks : [];
+
   if (tasks.length === 0) {
+    document.getElementById('planTableWrap').style.display = 'none';
+    document.getElementById('timelineWrap').style.display  = 'none';
     document.getElementById('planPlaceholder').innerHTML =
-      '<i class="fas fa-calendar-times fa-2x mb-2 d-block" style="opacity:.2;"></i>No bookings found for this date.';
+      '<i class="fas fa-calendar-times fa-2x mb-2 d-block" style="opacity:.2;"></i>No moves on this day.';
     document.getElementById('planPlaceholder').style.display = 'block';
     return;
   }
@@ -458,16 +524,21 @@ function drawTimeline(tasks) {
 
 /* ── CSV Export ──────────────────────────────────────────────── */
 function exportCsv() {
-  if (!planData || !planData.tasks.length) return;
+  if (!planData) return;
+  const tasks = planData.all_tasks || planData.tasks || [];
+  if (!tasks.length) return;
   const cols = ['type','carId','storage','worker','moveStart','moveEnd','movingMin','move',
                 'dropoffTime','depFlight','arrFlight','arrReadyBy','storageDeadline','noReturnReason'];
   const lines = [cols.join(',')];
-  planData.tasks.forEach(r => {
+  tasks.forEach(r => {
     lines.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
   });
+  const from = planData.date_from || planData.date || 'plan';
+  const to   = planData.date_to   || from;
+  const filename = from === to ? `plan_${from}.csv` : `plan_${from}_to_${to}.csv`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-  a.download = `day_plan_${planData.date}.csv`;
+  a.download = filename;
   a.click();
 }
 
