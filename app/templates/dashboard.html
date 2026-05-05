@@ -200,12 +200,14 @@
                 <th>Car ID</th>
                 <th>Storage</th>
                 <th>Worker</th>
-                <th>Moving time (min)</th>
                 <th>Move</th>
+                <th>Moving time</th>
                 <th>Move window</th>
-                <th>Drop-off time</th>
-                <th>Ready by (arrival)</th>
-                <th>Note / No-return reason</th>
+                <th>Departure drop-off</th>
+                <th>Dep. flight</th>
+                <th>Arr. flight</th>
+                <th>Return deadline</th>
+                <th>Note</th>
               </tr>
             </thead>
             <tbody id="plan-tbody"></tbody>
@@ -437,20 +439,22 @@ document.addEventListener('DOMContentLoaded', function () {
       const noteHtml  = r.note
         ? `<span class="ts-note">${esc(r.note)}</span>`
         : '';
+      const noRet = (r.noReturnReason || '').trim();
       return `<tr class="task-row">
         <td><span class="badge ${typeClass}">${esc(r.type)}</span></td>
         <td><strong>${esc(r.carId)}</strong></td>
         <td><span class="badge bg-secondary">${esc(r.storage||'—')}</span></td>
         <td class="${wkrClass}">${esc(r.worker)}</td>
-        <td><strong>${r.movingMin}</strong> min
-            <small class="text-muted">(${esc(r.moveStart)} – ${esc(r.moveEnd)})</small></td>
-        <td><small>${esc(r.move)}</small></td>
-        <td><small class="text-muted">${esc(r.moveStart)} → ${esc(r.moveEnd)}</small></td>
+        <td><small>${esc(r.move||'—')}</small></td>
+        <td><strong>${r.movingMin != null ? r.movingMin : '—'}</strong> min</td>
+        <td><small class="text-muted">${esc(r.moveStart||'—')} → ${esc(r.moveEnd||'—')}</small></td>
         <td><small class="ts-drop">${esc(r.dropoffTime||'—')}</small></td>
+        <td><small class="text-muted">${esc(r.depFlight||'—')}</small></td>
+        <td><small class="text-muted">${esc(r.arrFlight||'—')}</small></td>
         <td><small class="ts-ready">${esc(r.arrReadyBy||'—')}</small></td>
         <td>
           ${noteHtml}
-          ${r.noReturnReason ? '<span class="badge bg-dark text-muted ms-1" title="No return trip assigned">↩ ' + esc(r.noReturnReason) + '</span>' : ''}
+          ${noRet ? '<span class="badge bg-secondary ms-1" title="No return trip: ' + esc(noRet) + '">↩ ' + esc(noRet) + '</span>' : ''}
         </td>
       </tr>`;
     }).join('');

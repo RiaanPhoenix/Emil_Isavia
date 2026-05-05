@@ -117,11 +117,15 @@
                 <th>Type</th>
                 <th>Car ID</th>
                 <th>Worker</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Min</th>
+                <th>Move start</th>
+                <th>Move end</th>
+                <th>Moving time</th>
                 <th>Move</th>
-                <th>Return Deadline</th>
+                <th>Departure drop-off</th>
+                <th>Dep. flight</th>
+                <th>Arr. flight</th>
+                <th>Return deadline</th>
+                <th>Note</th>
               </tr>
             </thead>
             <tbody id="planTbody"></tbody>
@@ -328,8 +332,8 @@ function renderPlan(data) {
     pill('fas fa-users',     summary.num_workers   + ' workers'),
     pill('fas fa-clock',     summary.total_work_min + ' min'),
     pill('fas fa-hourglass', summary.total_work_h  + ' h'),
-    pill('fas fa-warehouse', summary.n_gull + ' → Gull'),
-    pill('fas fa-warehouse', summary.n_p3   + ' → P3'),
+    pill('fas fa-arrow-right', (summary.n_move1 ?? summary.n_gull ?? '?') + ' MOVE1'),
+    pill('fas fa-arrow-left',  (summary.n_move2 ?? summary.n_p3   ?? '?') + ' MOVE2'),
   ].join('');
   document.getElementById('planSummary').style.display = 'block';
 
@@ -361,11 +365,15 @@ function renderPlan(data) {
       <td><span class="badge ${tc}">${esc(r.type)}</span></td>
       <td>${esc(r.carId)}</td>
       <td class="${wc}">${esc(r.worker)}</td>
-      <td>${esc(r.start)}</td>
-      <td>${esc(r.end)}</td>
-      <td>${r.durationMin}</td>
-      <td><small>${esc(r.move)}</small></td>
-      <td><small class="text-info">${esc(r.returnDeadline)}</small></td>
+      <td><small>${esc(r.moveStart||'—')}</small></td>
+      <td><small>${esc(r.moveEnd||'—')}</small></td>
+      <td>${r.movingMin != null ? r.movingMin : '—'} min</td>
+      <td><small>${esc(r.move||'—')}</small></td>
+      <td><small class="ts-drop">${esc(r.dropoffTime||'—')}</small></td>
+      <td><small class="text-muted">${esc(r.depFlight||'—')}</small></td>
+      <td><small class="text-muted">${esc(r.arrFlight||'—')}</small></td>
+      <td><small class="ts-ready">${esc(r.arrReadyBy||'—')}</small></td>
+      ${r.noReturnReason ? '<td><small class="text-warning">↩ ' + esc(r.noReturnReason) + '</small></td>' : '<td></td>'}
     </tr>`;
   }).join('');
   document.getElementById('planTableWrap').style.display = 'block';
@@ -422,8 +430,11 @@ function drawTimeline(tasks) {
     ctx.fillText(wkr, 4, y0 + ROW_H / 2 + 4);
 
     tasks.filter(t => t.worker === wkr).forEach(t => {
-      const [sh, sm] = t.start.slice(11).split(':').map(Number);
-      const [eh, em] = t.end.slice(11).split(':').map(Number);
+      const msStr = (t.moveStart || t.start || '').slice(11) || '00:00';
+      const meStr = (t.moveEnd   || t.end   || '').slice(11) || '00:00';
+      const [sh, sm] = msStr.split(':').map(Number);
+      const [eh, em] = meStr.split(':').map(Number);
+      if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return;
       const x1   = LABEL + ((sh * 60 + sm) / 1440) * (W - LABEL);
       const x2   = LABEL + ((eh * 60 + em) / 1440) * (W - LABEL);
       const barW = Math.max(x2 - x1, 4);
@@ -448,8 +459,8 @@ function drawTimeline(tasks) {
 /* ── CSV Export ──────────────────────────────────────────────── */
 function exportCsv() {
   if (!planData || !planData.tasks.length) return;
-  const cols = ['type','carId','storage','worker','start','end','durationMin','move',
-                'depFlight','arrFlight','storageDeadline','returnDeadline'];
+  const cols = ['type','carId','storage','worker','moveStart','moveEnd','movingMin','move',
+                'dropoffTime','depFlight','arrFlight','arrReadyBy','storageDeadline','noReturnReason'];
   const lines = [cols.join(',')];
   planData.tasks.forEach(r => {
     lines.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
