@@ -1,138 +1,124 @@
-# MEMORY.md — Emil_Isavia Project
+# Emil_Isavia — Project Memory
 
-> Long-term project memory. Updated as work progresses.
-
----
-
-## Overview
-
-**Emil_Isavia** — Premium Valet Parking Optimization & Simulation system for Isavia at Keflavík International Airport (BIKF).
-
-- **Repo:** `git@github.com:RiaanPhoenix/Emil_Isavia.git`
-- **Local:** `/home/claw/.openclaw/workspace-worker-two/Emil_Isavia/`
-- **Stack:** Python 3.8+, Flask, GurobiPy (MILP optimizer), SimPy (discrete-event simulation)
-- **Frontend:** Bootstrap HTML templates + vanilla JS
-
----
-
-## The Problem
-
-Isavia's Premium valet parking service at Keflavík:
-- Customers drop cars at **Reception** (14 spots) before departure
-- Staff move cars to storage: **Gull** (50 spots, close) or **P3** (150 spots, far)
-- Cars must be at **Delivery** (20 spots) ≥15 min before customer return
-- **Hard constraint:** Cars MUST be ready on time
-- **Objective:** Minimize total staff time
-
-### Physical Layout
-```
-Reception (14) ──3min──► Gull (50) ──4min──► Delivery (20)
-     │                                          ▲
-     └────8min──► P3 (150) ──────9min──────────┘
-```
+## What This Is
+Premium Valet Parking Optimization system for Isavia at Keflavík Airport (BIKF).
+Workers move customer cars between zones: Móttökustæði (reception/drop-off), Gull storage, P3 storage, Skilastæði (arrival/pick-up).
 
 ---
 
 ## Architecture
 
-```
-app/
-├── api/
-│   ├── flights.py          # OpenSky / AviationStack / AirLabs integration
-│   └── parking_api.py      # Real Isavia valet booking API
-├── optimization/
-│   └── valet_optimizer.py  # GurobiPy MILP model (+ heuristic fallback)
-├── simulation/
-│   └── valet_sim.py        # SimPy Monte Carlo simulation
-├── static/
-│   ├── css/style.css
-│   └── js/main.js
-└── templates/
-    ├── base.html
-    ├── index.html
-    ├── optimize.html
-    └── simulate.html
+### Zones & Capacities
+| Zone | Role | Cap |
+|---|---|---|
+| Móttökustæði | Customer drop-off spot | 14 |
+| Gull | Storage (preferred) | 50 |
+| P3 | Storage (overflow) | 150 |
+| Skilastæði | Customer pick-up spot | **14** (hard limit) |
 
-config/settings.py          # All config + env vars
-app.py                      # Main Flask entrypoint
-```
+### Two Worker Moves Per Car
+- **MOVE1**: Móttökustæði → storage (Gull or P3), on the departure day
+- **MOVE2**: storage → Skilastæði, on the arrival day (must arrive ≥90 min before flight)
+
+### Backhaul Optimization
+After a MOVE1, the worker is already at the storage zone. If another car there needs MOVE2 within 4 hours, the worker drives it to Skilastæði instead of walking back empty. Only happens if:
+1. Car is physically already in storage
+2. Return deadline within 4h (BACKHAUL_WINDOW_H)
+3. Deadline hasn't passed
+4. Skilastæði has free capacity
 
 ---
 
-## Key Config
-
-| Parameter | Value |
+## Key Files
+| File | Purpose |
 |---|---|
-| Airport ICAO | BIKF |
-| Reception capacity | 14 |
-| Gull capacity | 50 |
-| P3 capacity | 150 |
-| Delivery capacity | 20 |
-| Delivery lead time | 15 min |
-| Time slot granularity | 15 min |
-| Planning horizon | 24 h |
-| Max staff | 10 |
-| Sim runs (Monte Carlo) | 10 |
+| `app.py` | Flask app, all routes |
+| `app/optimization/greedy_scheduler.py` | Core scheduler — `schedule_range()`, `schedule_day()`, `fifo_schedule()` |
+| `app/api/parking_api.py` | Parking API client (Azure) |
+| `app/api/flights.py` | Flight data + mock booking generator |
+| `app/templates/index.html` | Main page — date range picker, schedule table, timeline |
+| `app/templates/dashboard.html` | Analytics dashboard with same scheduler UI |
+| `config/settings.py` | Travel times, capacities, API config |
+| `valet_optimizer.py` | Standalone CLI optimizer (separate from web app) |
 
 ---
 
 ## API Endpoints
-
-| Method | Path | Description |
+| Endpoint | Method | Purpose |
 |---|---|---|
-| GET | `/api/bookings` | Generate valet bookings |
-| POST | `/api/optimize` | Run optimization model |
-| POST | `/api/simulate` | Run simulation |
-| GET | `/api/status` | System health check |
+| `/api/greedy-schedule` | POST | Single-day schedule (compat) |
+| `/api/greedy-schedule-range` | POST | Date range schedule |
+| `/api/status` | GET | System status |
+| `/api/live-status` | GET | Live parking occupancy |
 
----
+### Request format for `/api/greedy-schedule-range`
+```json
+{
+  "date_from": "2026-05-05",
+  "date_to": "2026-05-11",
+  "day_movers": 2,
+  "night_workers": 2,
+  "supervisor": true,
+  "move2_window": 60
+}
+```
 
-## Git History
-
-| Hash | Message |
+### Task field schema (in response)
+| Field | Description |
 |---|---|
-| `5bb878b` | Fix: mock bookings now vary by date (was using fixed random seed) |
-| `8d690c5` | UX: hide customer count field when using real parking API |
-| `4ff0ae2` | Fix: numpy int64 JSON serialisation error and simulation zone-sync bug |
-| `ade8d1f` | Redesign: clean professional UI — navy/slate palette, Inter typography, refined layout |
-| `fd58abb` | Add live feed functionality for real-time parking occupancy monitoring |
-| `f928da2` | INTEGRATED: Premium Parking API Connection |
-| `71bb1b1` | CORRECTED: Implement actual problem — Isavia Premium Valet Parking |
-| `ccc57d4` | Initial implementation: Aviation Traffic Optimization System |
+| `type` | `MOVE1` or `MOVE2` |
+| `carId` | Booking/plate ID |
+| `storage` | `Gull` or `P3` |
+| `worker` | `W1` or `W2` |
+| `movingMin` | Duration of the drive (minutes) |
+| `move` | Human label e.g. `Móttökustæði → Gull` |
+| `moveStart` | When worker starts the move |
+| `moveEnd` | When worker finishes the move |
+| `dropoffTime` | When customer drops car at reception |
+| `depFlight` | Departure flight time |
+| `arrFlight` | Arrival flight time |
+| `arrReadyBy` | Car must be at Skilastæði by this time |
+| `storageDeadline` | Car must be in storage by this time |
+| `noReturnReason` | Why no backhaul was assigned (MOVE1 only) |
 
 ---
 
-## Current State (2026-03-28)
+## Scheduler Design (as of 2026-05-05)
 
-- Full optimization + simulation pipeline functional
-- Real parking API integrated (`parking_api.py`) — credentials not yet set
-- Live feed for real-time occupancy monitoring added
-- GurobiPy with heuristic fallback (no license required for dev)
-- Flight data: OpenSky (free), AviationStack, AirLabs supported
-- Frontend: 3-step workflow (Generate → Optimize → Simulate)
-- UI fully redesigned — navy/slate palette, Inter font, professional look
+Uses **absolute time model** (minutes since 2000-01-01 00:00:00).
+This correctly handles cars dropped off days/weeks ago that return today.
 
----
+Per day, `fifo_schedule()` receives:
+- `move1_cars` — cars whose drop-off falls today
+- `move2_cars` — cars whose return deadline falls today
+- `storage_pool` — cars already in storage from prior days
 
-## Known Issues / TODOs
-
-- [ ] Real Parking API not connecting — needs `PARKING_API_USERNAME` + `PARKING_API_PASSWORD` in `.env`
-- [ ] Gurobi license not available in dev; heuristic fallback in use
-- [ ] Tests in `tests/` — coverage status unknown
-- [ ] Docker setup in README but not verified
+Storage pool carries across days within a range run, so capacity is tracked correctly.
 
 ---
 
-## Bugs Fixed (2026-03-28)
+## Known Issues / To Do (2026-05-05)
 
-- **numpy int64 JSON crash** — simulation returned numpy scalar types; fixed by casting all to `float()`/`int()` before response
-- **Simulation zone-sync** — planned moves fired before car arrived at source zone; fixed with up-to-60-min tolerance wait
-- **Mock data fixed seed** — all dates returned identical bookings; fixed by seeding RNG from date (`YYYYMMDD`)
-- **Customer count field** — shown even when using real API; now hidden unless Mock mode selected
+1. **MOVE1 timing** — currently pinned to 23:49 (storage_ddl − move duration) when no worker is free earlier. Should schedule as close to actual dropoff time as possible, not just before deadline.
+2. **Backhaul window** — 4h may need tuning based on real traffic patterns. With real API data, check if backhauled trips actually appear.
+3. **Real API credentials** — `.env` file needs `PARKING_API_USERNAME` and `PARKING_API_PASSWORD`. Without them, system falls back to mock bookings seeded by date.
+4. **Responsive table** — many columns on the schedule table, needs collapsing on mobile.
+5. **CLI vs web** — `valet_optimizer.py` (root level) and `app/optimization/greedy_scheduler.py` are separate. Should eventually unify.
+6. **No authentication** — Flask runs in debug mode, no login.
+7. **Security** — repo is PUBLIC, old API password in git history. Must rotate + make private + scrub.
 
 ---
 
-## Notes
+## Security Note
+⚠️ Repo is PUBLIC. Old password `Dunder.Mifflin!26` is in git history.
+Actions needed:
+1. Rotate Azure API password
+2. Make GitHub repo private
+3. Optionally: `git filter-repo` to scrub history
 
-- Emil working on this project heavily
-- Memory file created: 2026-03-28
+---
+
+## Session History
+- **2026-05-05**: Full scheduler rewrite, date range UI, backhaul tightening, field schema overhaul, `.slice` crash fixes
+- **2026-04-29**: Nav/path fixes, parking dashboard work
+- **2026-04-28**: Initial parking dashboard build
