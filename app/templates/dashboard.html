@@ -205,7 +205,7 @@
                 <th>Move window</th>
                 <th>Drop-off time</th>
                 <th>Ready by (arrival)</th>
-                <th>Note</th>
+                <th>Note / No-return reason</th>
               </tr>
             </thead>
             <tbody id="plan-tbody"></tbody>
@@ -375,9 +375,9 @@ document.addEventListener('DOMContentLoaded', function () {
       pill('fas fa-tasks',      summary.total_tasks    + ' moves'),
       pill('fas fa-clock',      summary.total_work_min + ' min'),
       pill('fas fa-hourglass',  summary.total_work_h   + ' h'),
-      pill('fas fa-warehouse',  (days.reduce((a,d)=>a+(d.summary.n_gull||0),0)) + ' → Gull'),
-      pill('fas fa-warehouse',  (days.reduce((a,d)=>a+(d.summary.n_p3||0),0))   + ' → P3'),
-      pill('fas fa-redo',       (days.reduce((a,d)=>a+(d.summary.n_backhaul||0),0)) + ' backhauled'),
+      pill('fas fa-arrow-right', summary.n_move1 + ' MOVE1'),
+      pill('fas fa-arrow-left',  summary.n_move2 + ' MOVE2'),
+      pill('fas fa-redo',        summary.n_backhaul + ' backhauled'),
     ].join('');
     show(elSummary);
 
@@ -448,7 +448,10 @@ document.addEventListener('DOMContentLoaded', function () {
         <td><small class="text-muted">${esc(r.moveStart)} → ${esc(r.moveEnd)}</small></td>
         <td><small class="ts-drop">${esc(r.dropoffTime||'—')}</small></td>
         <td><small class="ts-ready">${esc(r.arrReadyBy||'—')}</small></td>
-        <td>${noteHtml}</td>
+        <td>
+          ${noteHtml}
+          ${r.noReturnReason ? '<span class="badge bg-dark text-muted ms-1" title="No return trip assigned">↩ ' + esc(r.noReturnReason) + '</span>' : ''}
+        </td>
       </tr>`;
     }).join('');
     show(elTableWrap);
@@ -503,10 +506,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* Bars */
       tasks.filter(t => t.worker === wkr).forEach(t => {
-        const [sh, sm] = t.moveStart.slice(11).split(':').map(Number);
-        const [eh, em] = t.moveEnd.slice(11).split(':').map(Number);
+        const msStr = (t.moveStart || '').slice(11) || '00:00';
+        const meStr = (t.moveEnd   || '').slice(11) || '00:00';
+        const [sh, sm] = msStr.split(':').map(Number);
+        const [eh, em] = meStr.split(':').map(Number);
+        if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return;
         const startMin = sh * 60 + sm;
         const endMin   = eh * 60 + em;
+        if (startMin < 0 || startMin > 1440 || endMin < 0 || endMin > 1440) return;
         const x1   = LABEL + (startMin / 1440) * (W - LABEL);
         const barW = Math.max(LABEL + (endMin / 1440) * (W - LABEL) - x1, 5);
         const barH = ROW_H - 8;
@@ -541,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tasks = planData.all_tasks || [];
     if (!tasks.length) return;
     const cols = ['type','carId','storage','worker','movingMin','move','moveStart','moveEnd',
-                  'dropoffTime','depFlight','arrFlight','arrReadyBy','storageDeadline','note'];
+                  'dropoffTime','depFlight','arrFlight','arrReadyBy','storageDeadline','note','noReturnReason'];
     const lines = [cols.join(',')];
     tasks.forEach(r => {
       lines.push(cols.map(c => `"${String(r[c]??'').replace(/"/g,'""')}"`).join(','));
